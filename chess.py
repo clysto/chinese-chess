@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Dict, Iterable, Iterator, List, Optional, Tuple, Generic, TypeVar
 import dataclasses
 import typing
 
@@ -86,6 +86,13 @@ BB_ALL = 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff
 BB_IN_BOARD = 0x0000_0000_0000_0ff8_0ff8_0ff8_0ff8_0ff8_0ff8_0ff8_0ff8_0ff8_0ff8_0000_0000_0000
 BB_RED_SIDE = 0x0000_0000_0000_0000_0000_0000_0000_0000_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff
 BB_BLACK_SIDE = 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_0000_0000_0000_0000_0000_0000_0000_0000
+
+
+def print_bitboard(bb: Bitboard) -> None:
+    s = format(bb, '0256b').replace("1", "@").replace("0", ".")
+    for i in range(3, 13):
+        print(f"{12-i} " + " ".join(s[i * 16 + 16 - 1 - 3:i * 16 - 1 + 4:-1]))
+    print("  a b c d e f g h i")
 
 
 BB_SQUARES = [
@@ -178,11 +185,15 @@ def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) 
     return attacks
 
 
+def _rook_attacks(square: Square, occupied: Bitboard):
+    return _sliding_attacks(square, occupied, [16, -16, -1, 1])
+
+
 def _cannon_attacks(square: Square, occupied: Bitboard) -> Bitboard:
     attacks = BB_EMPTY
     deltas = [16, -16, -1, 1]
-    hops = 0
     for delta in deltas:
+        hops = 0
         sq = square
         while True:
             sq += delta
@@ -203,32 +214,34 @@ def _step_attacks(square: Square, deltas: Iterable[int]) -> Bitboard:
     return _sliding_attacks(square, BB_ALL, deltas)
 
 
-def _pawn_attacks() -> List[List[Bitboard]]:
+def _pawn_attacks(reverse=False) -> List[List[Bitboard]]:
     attacks = [[], []]
+    direction = -1 if reverse else 1
     for sq in SQUARES:
-        # 跳过不合法的起始点
+        # 红兵
         if sq > I4:
             # 过河兵
-            attacks[RED].append(_step_attacks(sq, [-1, 16, 1]))
+            attacks[RED].append(_step_attacks(sq, [-1, 16 * direction, 1]))
         else:
-            attacks[RED].append(_step_attacks(sq, [16]))
+            attacks[RED].append(_step_attacks(sq, [16 * direction]))
     for sq in SQUARES:
+        # 黑卒
         if sq < A5:
             # 过河兵
-            attacks[BLACK].append(_step_attacks(sq, [-1, -16, 1]))
+            attacks[BLACK].append(_step_attacks(sq, [-1, -16 * direction, 1]))
         else:
-            attacks[BLACK].append(_step_attacks(sq, [-16]))
+            attacks[BLACK].append(_step_attacks(sq, [-16 * direction]))
     return attacks
 
 
-def _knight_attacks() -> Tuple[List[Bitboard], List[Dict[Bitboard, Bitboard]]]:
+def _knight_attacks(reverse=False) -> Tuple[List[Bitboard], List[Dict[Bitboard, Bitboard]]]:
     mask_table = []
     attack_table = []
-    knight_deltas = [33, 31, -14, 18, -33, -31, -18, 14, ]
-    directions = [16, 1, -16, -1]
+    knight_deltas = [33, 31, -14, 18, -33, -31, -18, 14] if not reverse else [14, 31, 33, 18, -14, -31, -18, -33]
+    directions = [16, 1, -16, -1] if not reverse else [15, 17, -15, -17]
     for square in SQUARES:
         if not square_in_board(square):
-            attack_table.append({})
+            attack_table.append({BB_EMPTY: BB_EMPTY})
             mask_table.append(BB_EMPTY)
             continue
         attacks = {}
@@ -261,7 +274,7 @@ def _bishop_attacks() -> List[Bitboard]:
     for square in SQUARES:
         square_side = BB_RED_SIDE if BB_SQUARES[square] & BB_RED_SIDE else BB_BLACK_SIDE
         if not (BB_SQUARES[square] & BB_SQUARES_BISHOP):
-            attack_table.append({})
+            attack_table.append({BB_EMPTY: BB_EMPTY})
             mask_table.append(BB_EMPTY)
             continue
         attacks = {}
@@ -284,7 +297,7 @@ def _bishop_attacks() -> List[Bitboard]:
     return mask_table, attack_table
 
 
-def _king_attacks():
+def _king_attacks() -> List[Bitboard]:
     attacks = []
     for square in SQUARES:
         if not(BB_SQUARES[square] & BB_IN_PALACE):
@@ -294,7 +307,7 @@ def _king_attacks():
     return attacks
 
 
-def _advisor_attacks():
+def _advisor_attacks() -> List[Bitboard]:
     attacks = []
     for square in SQUARES:
         if not(BB_SQUARES[square] & BB_SQUARES_ADVISOR):
@@ -305,8 +318,10 @@ def _advisor_attacks():
 
 
 BB_KNIGHT_MASKS, BB_KNIGHT_ATTACKS = _knight_attacks()
+BB_KNIGHT_REVERSED_MASKS, BB_KNIGHT_REVERSED_ATTACKS = _knight_attacks(reverse=True)
 BB_BISHOP_MASKS, BB_BISHOP_ATTACKS = _bishop_attacks()
 BB_PAWN_ATTACKS = _pawn_attacks()
+BB_PAWN_REVERSED_ATTACKS = _pawn_attacks(reverse=True)
 BB_KING_ATTACKS = _king_attacks()
 BB_ADVISOR_ATTACKS = _advisor_attacks()
 
@@ -377,6 +392,44 @@ class Move:
     @classmethod
     def null(cls) -> Move:
         return cls(0, 0)
+
+
+BoardT = TypeVar("BoardT", bound="Board")
+
+
+class _BoardState(Generic[BoardT]):
+
+    def __init__(self, board: BoardT) -> None:
+        self.pawns = board.pawns
+        self.knights = board.knights
+        self.bishops = board.bishops
+        self.rooks = board.rooks
+        self.cannons = board.cannons
+        self.advisors = board.advisors
+        self.kings = board.kings
+
+        self.occupied_r = board.occupied_co[RED]
+        self.occupied_b = board.occupied_co[BLACK]
+        self.occupied = board.occupied
+
+        self.turn = board.turn
+        self.fullmove_number = board.fullmove_number
+
+    def restore(self, board: BoardT) -> None:
+        board.pawns = self.pawns
+        board.knights = self.knights
+        board.bishops = self.bishops
+        board.rooks = self.rooks
+        board.cannons = self.cannons
+        board.advisors = self.advisors
+        board.kings = self.kings
+
+        board.occupied_co[RED] = self.occupied_r
+        board.occupied_co[BLACK] = self.occupied_b
+        board.occupied = self.occupied
+
+        board.turn = self.turn
+        board.fullmove_number = self.fullmove_number
 
 
 class BaseBoard:
@@ -463,7 +516,7 @@ class BaseBoard:
                 square_index += 7
 
     def set_board_fen(self, fen: str) -> None:
-            self._set_board_fen(fen)
+        self._set_board_fen(fen)
 
     def board_fen(self) -> str:
         builder = []
@@ -472,7 +525,7 @@ class BaseBoard:
         for square in SQUARES_180:
             if not square_in_board(square):
                 continue
-            
+
             piece = self.piece_at(square)
 
             if not piece:
@@ -492,7 +545,7 @@ class BaseBoard:
                     builder.append("/")
 
         return "".join(builder)
-    
+
     def _remove_piece_at(self, square: Square) -> Optional[PieceType]:
         piece_type = self.piece_type_at(square)
         mask = BB_SQUARES[square]
@@ -616,7 +669,8 @@ class BaseBoard:
             color = bool(bb_square & self.occupied_co[RED])
             return BB_PAWN_ATTACKS[color][square]
         if bb_square & self.kings:
-            return BB_KING_ATTACKS[square]
+            # 老将对脸杀
+            return BB_KING_ATTACKS[square] | (_rook_attacks(square, self.occupied) & self.kings)
         if bb_square & self.advisors:
             return BB_ADVISOR_ATTACKS[square]
         elif bb_square & self.knights:
@@ -624,11 +678,31 @@ class BaseBoard:
         elif bb_square & self.bishops:
             return BB_BISHOP_ATTACKS[square][BB_BISHOP_MASKS[square] & self.occupied]
         elif bb_square & self.rooks:
-            return _sliding_attacks(square, self.occupied, [16, -16, -1, 1])
+            return _rook_attacks(square, self.occupied)
         elif bb_square & self.cannons:
             return _cannon_attacks(square, self.occupied)
         else:
             return BB_EMPTY
+
+    def _attackers_mask(self, color: Color, square: Square, occupied: Bitboard) -> Bitboard:
+        cannon_attacks = _cannon_attacks(square, occupied)
+        rook_attacks = _rook_attacks(square, occupied)
+        attackers = (
+            (cannon_attacks & self.cannons) |
+            (rook_attacks & self.rooks) |
+            (BB_KNIGHT_REVERSED_ATTACKS[square][occupied & BB_KNIGHT_REVERSED_MASKS[square]] & self.knights) |
+            (BB_BISHOP_ATTACKS[square][occupied & BB_BISHOP_MASKS[square]] & self.bishops) |
+            (BB_PAWN_REVERSED_ATTACKS[color][square] & self.pawns) |
+            (BB_ADVISOR_ATTACKS[square] & self.advisors) |
+            ((BB_KING_ATTACKS[square] | (rook_attacks & self.kings)) & self.kings)
+        )
+        return attackers & self.occupied_co[color]
+
+    def attackers_mask(self, color: Color, square: Square) -> Bitboard:
+        return self._attackers_mask(color, square, self.occupied)
+
+    def is_attacked_by(self, color: Color, square: Square) -> bool:
+        return bool(self.attackers_mask(color, square))
 
     def __str__(self) -> str:
         builder = []
@@ -695,16 +769,23 @@ class BaseBoard:
 
 class Board(BaseBoard):
 
+    turn: Color
+
+    fullmove_number: int
+
+    move_stack: List[Move]
+
     def __init__(self: Board, fen: Optional[str] = STARTING_FEN) -> None:
         BaseBoard.__init__(self, None)
-        self.turn = RED
+        self.move_stack = []
+        self._stack: List[_BoardState[Board]] = []
+
         if fen is None:
             self.clear()
         elif fen == STARTING_FEN:
             self.reset()
         else:
             self.set_fen(fen)
-
 
     def clear(self) -> None:
         self.turn = RED
@@ -719,7 +800,6 @@ class Board(BaseBoard):
     def set_fen(self, fen: str) -> None:
         parts = fen.split()
 
-        print(parts)
         try:
             board_part = parts.pop(0)
         except IndexError:
@@ -740,7 +820,7 @@ class Board(BaseBoard):
         parts.pop(0)
         parts.pop(0)
         parts.pop(0)
-        
+
         try:
             fullmove_part = parts.pop(0)
         except IndexError:
@@ -763,6 +843,29 @@ class Board(BaseBoard):
         self.turn = turn
         self.fullmove_number = fullmove_number
 
+    def checkers_mask(self) -> Bitboard:
+        king = self.king(self.turn)
+        return BB_EMPTY if king is None else self.attackers_mask(not self.turn, king)
+
+    def is_check(self) -> bool:
+        return bool(self.checkers_mask())
+
+    def is_checkmate(self) -> bool:
+        if not self.is_check():
+            return False
+        return not any(self.generate_legal_moves())
+
+    def _is_safe(self, king: Square, move: Move) -> bool:
+        # TODO:改进检查算法
+        self.push(move)
+        if move.from_square == king:
+            king = move.to_square
+        if self.is_attacked_by(self.turn, king):
+            self.pop()
+            return False
+        else:
+            self.pop()
+            return True
 
     def generate_pseudo_legal_moves(self, from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD) -> Iterator[Move]:
         our_pieces = self.occupied_co[self.turn]
@@ -773,9 +876,53 @@ class Board(BaseBoard):
             for to_square in scan_reversed(moves):
                 yield Move(from_square, to_square)
 
+        # 炮不吃子着法
         for from_square in scan_reversed(from_squares & self.cannons):
             moves = _sliding_attacks(from_square, self.occupied, [16, -16, -1, 1]) & ~self.occupied & to_mask
             for to_square in scan_reversed(moves):
                 yield Move(from_square, to_square)
 
+    def generate_legal_moves(self, from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD) -> Iterator[Move]:
+        king_mask = self.kings & self.occupied_co[self.turn]
+        if king_mask:
+            king = msb(king_mask)
+            for move in self.generate_pseudo_legal_moves(from_mask, to_mask):
+                if self._is_safe(king, move):
+                    yield move
+        else:
+            yield from self.generate_pseudo_legal_moves(from_mask, to_mask)
 
+    def _board_state(self: Board) -> _BoardState[Board]:
+        return _BoardState(self)
+
+    def push(self, move: Move) -> None:
+        board_state = self._board_state()
+
+        self.move_stack.append(move)
+        self._stack.append(board_state)
+
+        if self.turn == BLACK:
+            self.fullmove_number += 1
+
+        if not move:
+            self.turn = not self.turn
+            return
+
+        piece_type = self._remove_piece_at(move.from_square)
+        assert piece_type is not None, f"push() expects move to be pseudo-legal, but got {move} in {self.board_fen()}"
+
+        self._set_piece_at(move.to_square, piece_type, self.turn)
+        self.turn = not self.turn
+
+    def pop(self) -> Move:
+        move = self.move_stack.pop()
+        self._stack.pop().restore(self)
+        return move
+
+    def peek(self) -> Move:
+        return self.move_stack[-1]
+
+    def push_iccs(self, iccs: str):
+        # TODO:检查合法
+        move = Move.from_iccs(iccs)
+        self.push(move)
