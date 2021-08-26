@@ -32,7 +32,7 @@ class Application(tk.Frame):
         self.pack()
         self.board = chess.Board()
         self.create_widgets()
-        self.update()
+        self.update_canvas()
 
     def load_resources(self) -> None:
         self.resources = {}
@@ -61,26 +61,27 @@ class Application(tk.Frame):
         )
         self.canvas.create_image(0, 0, image=self.resources["bg"], anchor="nw")
         self.canvas.bind("<Button-1>", self.handle_click)
-        self.button1 = tk.Button(self, text="悔棋",command=self.pop)
+        self.button1 = tk.Button(self, text="悔棋", command=self.pop)
         self.canvas.pack()
         self.button1.pack()
 
     def pop(self):
+        if self.checkmate:
+            return
         if self.board.turn == chess.RED:
             if self.board.peek():
                 self.board.pop()
                 self.board.pop()
-                self.update()
+                self.update_canvas()
 
     def black_move(self):
         move = best_move(self.board, think_time=1)
         self.board.push(move)
-        self.update()
-        self.select_square = None
-        self.canvas.update()
         if self.board.is_checkmate():
             self.checkmate = True
-            self.update()
+        self.update_canvas()
+        self.select_square = None
+        self.update()
 
     def handle_click(self, event: tk.Event):
         if self.checkmate:
@@ -101,10 +102,10 @@ class Application(tk.Frame):
                 move = chess.Move(self.select_square, square)
                 if move in self.moves:
                     self.board.push(move)
-                    self.update()
+                    self.update_canvas()
                     if self.board.is_checkmate():
                         self.checkmate = True
-                        self.update()
+                        self.update_canvas()
                     else:
                         threading.Thread(target=self.black_move).start()
 
@@ -139,7 +140,7 @@ class Application(tk.Frame):
         square = chess.msb(chess.BB_FILES[file] & chess.BB_RANKS[rank])
         return chess.SQUARES_180[square]
 
-    def update(self) -> None:
+    def update_canvas(self) -> None:
         for id in self.pieces + self.boxs:
             self.canvas.delete(id)
         for square in chess.SQUARES_IN_BOARD:
