@@ -167,6 +167,37 @@ def scan_reversed(bb: Bitboard) -> Iterator[Square]:
         bb ^= BB_SQUARES[r]
 
 
+def count_ones(bb: Bitboard):
+    s = 0
+    t = {'0': 0, '1': 1, '2': 1, '3': 2, '4': 1, '5': 2, '6': 2, '7': 3}
+    for c in oct(bb)[2:]:
+        s += t[c]
+    return s
+
+
+def between(a: Square, b: Square) -> Bitboard:
+    file_a, file_b = square_file(a), square_file(b)
+    rank_a, rank_b = square_rank(a), square_rank(b)
+    if file_a == file_b:
+        bb = BB_FILES[file_a] & ((BB_ALL << a) ^ (BB_ALL << b))
+    elif rank_a == rank_b:
+        bb = BB_RANKS[rank_a] & ((BB_ALL << a) ^ (BB_ALL << b))
+    else:
+        bb = BB_EMPTY
+    return bb & (bb - 1)
+
+
+def line(a: Square, b: Square):
+    file_a, file_b = square_file(a), square_file(b)
+    rank_a, rank_b = square_rank(a), square_rank(b)
+    if file_a == file_b:
+        return BB_FILES[file_a]
+    elif rank_a == rank_b:
+        return BB_RANKS[rank_a]
+    else:
+        return BB_EMPTY
+
+
 def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) -> Bitboard:
     attacks = BB_EMPTY
 
@@ -855,17 +886,52 @@ class Board(BaseBoard):
             return False
         return not any(self.generate_legal_moves())
 
-    def _is_safe(self, king: Square, move: Move) -> bool:
-        # TODO:改进检查算法
-        self.push(move)
-        if move.from_square == king:
-            king = move.to_square
-        if self.is_attacked_by(self.turn, king):
-            self.pop()
+    def _is_safe(self, move: Move) -> bool:
+        current_state = self._board_state()
+        piece_type = self._remove_piece_at(move.from_square)
+        self._set_piece_at(move.to_square, piece_type, self.turn)
+        if self.is_check():
+            current_state.restore(self)
             return False
         else:
-            self.pop()
+            current_state.restore(self)
             return True
+
+    def _slider_blockers(self, king: Square) -> Bitboard:
+        sliders = self.rooks | self.kings | self.cannons
+
+        snipers = _rook_attacks(king, BB_EMPTY) & sliders
+
+        blockers = BB_EMPTY
+
+        for sniper in scan_reversed(snipers & self.occupied_co[not self.turn]):
+            b = between(king, sniper) & self.occupied
+
+            if BB_SQUARES[sniper] & self.cannons:
+                # 如果路线上只有两个棋子则是一个 blocker
+                if b and count_ones(b) == 2:
+                    blockers |= b
+            else:
+                # 如果路线上只有一个棋子则是一个 blocker
+                if b and BB_SQUARES[msb(b)] == b:
+                    blockers |= b
+
+        return blockers & self.occupied_co[self.turn]
+
+    def _knight_blockers(self, king: Square) -> Bitboard:
+        knights = self.knights & self.occupied_co[not self.turn]
+        blockers = BB_EMPTY
+        occupied = BB_KNIGHT_REVERSED_MASKS[king] & self.occupied
+        masks = [BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 15],
+                 BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 17],
+                 BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 15],
+                 BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 17],
+                 ]
+        for mask in masks:
+            if (occupied & ~mask) and BB_KNIGHT_REVERSED_ATTACKS[king][mask] & knights:
+                blockers |= (occupied & ~mask)
+
+        return blockers & self.occupied_co[self.turn]
 
     def generate_pseudo_legal_moves(self, from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD) -> Iterator[Move]:
         our_pieces = self.occupied_co[self.turn]
@@ -887,7 +953,7 @@ class Board(BaseBoard):
         if king_mask:
             king = msb(king_mask)
             for move in self.generate_pseudo_legal_moves(from_mask, to_mask):
-                if self._is_safe(king, move):
+                if self._is_safe(move):
                     yield move
         else:
             yield from self.generate_pseudo_legal_moves(from_mask, to_mask)
