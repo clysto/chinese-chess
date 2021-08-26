@@ -689,6 +689,15 @@ class BaseBoard:
         else:
             return KING
 
+    def color_at(self, square: Square) -> Optional[Color]:
+        mask = BB_SQUARES[square]
+        if self.occupied_co[RED] & mask:
+            return RED
+        elif self.occupied_co[BLACK] & mask:
+            return BLACK
+        else:
+            return None
+
     def king(self, color: Color) -> Optional[Square]:
         king_mask = self.occupied_co[color] & self.kings
         return msb(king_mask) if king_mask else None
@@ -734,6 +743,12 @@ class BaseBoard:
 
     def is_attacked_by(self, color: Color, square: Square) -> bool:
         return bool(self.attackers_mask(color, square))
+
+    def piece_map(self, *, mask: Bitboard = BB_IN_BOARD) -> Dict[Square, Piece]:
+        result = {}
+        for square in scan_reversed(self.occupied & mask):
+            result[square] = typing.cast(Piece, self.piece_at(square))
+        return result
 
     def __str__(self) -> str:
         builder = []
@@ -980,13 +995,26 @@ class Board(BaseBoard):
         self._set_piece_at(move.to_square, piece_type, self.turn)
         self.turn = not self.turn
 
+    def fen(self) -> str:
+        return " ".join([
+            self.board_fen(),
+            "w" if self.turn == RED else "b"
+            "-",
+            "-",
+            str(0),
+            str(self.fullmove_number)
+        ])
+
     def pop(self) -> Move:
         move = self.move_stack.pop()
         self._stack.pop().restore(self)
         return move
 
     def peek(self) -> Move:
-        return self.move_stack[-1]
+        if len(self.move_stack):
+            return self.move_stack[-1]
+        else:
+            return None
 
     def push_iccs(self, iccs: str):
         # TODO:检查合法
