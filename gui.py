@@ -30,7 +30,7 @@ class Application(tk.Frame):
         self.master.title("中国象棋")
         self.master.resizable(False, False)
         self.pack()
-        self.board = chess.Board("9/5k2C/9/8N/9/9/9/9/3K5/9 w - - 0 1")
+        self.board = chess.Board()
         self.create_widgets()
         self.update()
 
@@ -61,18 +61,30 @@ class Application(tk.Frame):
         )
         self.canvas.create_image(0, 0, image=self.resources["bg"], anchor="nw")
         self.canvas.bind("<Button-1>", self.handle_click)
+        self.button1 = tk.Button(self, text="悔棋",command=self.pop)
         self.canvas.pack()
+        self.button1.pack()
+
+    def pop(self):
+        if self.board.turn == chess.RED:
+            if self.board.peek():
+                self.board.pop()
+                self.board.pop()
+                self.update()
 
     def black_move(self):
-        move = best_move(self.board)
+        move = best_move(self.board, think_time=1)
         self.board.push(move)
         self.update()
         self.select_square = None
+        self.canvas.update()
         if self.board.is_checkmate():
             self.checkmate = True
             self.update()
 
     def handle_click(self, event: tk.Event):
+        if self.checkmate:
+            return
         square = self.get_click_square(event.x, event.y)
         piece = self.board.piece_at(square)
         if piece and self.board.color_at(square) == chess.RED and self.board.turn == chess.RED:

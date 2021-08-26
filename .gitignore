@@ -3,3 +3,4 @@ __pycache__
 .direnv
 .vscode
 test.py
+.DS_Store
