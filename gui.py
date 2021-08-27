@@ -1,15 +1,34 @@
 import chess
 import tkinter as tk
+from tkinter import messagebox
 import threading
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 from elephantfish import best_move
 from PIL import Image, ImageTk
+
+THINK_TIME = 1
 
 
 class PhotoImage(ImageTk.PhotoImage):
     @classmethod
     def open(cls, fp):
         return cls(Image.open(fp))
+
+
+class ThinkThread(threading.Thread):
+    def __init__(self, board: chess.Board, on_finish: Callable):
+        threading.Thread.__init__(self)
+        self.board = board
+        self.on_finish = on_finish
+
+    def run(self):
+        move = best_move(self.board, think_time=THINK_TIME)
+        print("computer move:" + str(move))
+        if self.on_finish:
+            self.on_finish(move)
+
+    def stop(self):
+        self.on_finish = None
 
 
 class Application(tk.Frame):
@@ -22,6 +41,7 @@ class Application(tk.Frame):
     moves: List[chess.Move] = []
     board: chess.Board
     checkmate: bool = False
+    think_thread: ThinkThread = None
 
     def __init__(self, master: tk.Tk = None) -> None:
         super().__init__(master)
@@ -59,29 +79,49 @@ class Application(tk.Frame):
         self.canvas = tk.Canvas(
             self, bg="white", height=420, width=380, highlightthickness=0
         )
-        self.canvas.create_image(0, 0, image=self.resources["bg"], anchor="nw")
         self.canvas.bind("<Button-1>", self.handle_click)
         self.button1 = tk.Button(self, text="悔棋", command=self.pop)
+        self.button2 = tk.Button(self, text="重新开始", command=self.reset)
         self.canvas.pack()
-        self.button1.pack()
+        self.button1.pack(side="left", pady=10)
+        self.button2.pack(side="left", pady=10)
+
+    def reset(self):
+        is_reset = messagebox.askokcancel(message="是否重新开始？")
+        if not is_reset:
+            return
+        if self.think_thread:
+            self.think_thread.stop()
+        self.board = chess.Board()
+        self.boxs.clear()
+        self.moves.clear()
+        self.pieces.clear()
+        self.select_square = None
+        self.checkmate = False
+        self.update_canvas()
 
     def pop(self):
         if self.checkmate:
             return
-        if self.board.turn == chess.RED:
-            if self.board.peek():
-                self.board.pop()
-                self.board.pop()
-                self.update_canvas()
+        if self.think_thread:
+            self.think_thread.stop()
+        self.board.pop()
+        if self.board.turn == chess.BLACK:
+            self.board.pop()
+        self.update_canvas()
 
     def black_move(self):
-        move = best_move(self.board, think_time=1)
-        self.board.push(move)
-        if self.board.is_checkmate():
-            self.checkmate = True
-        self.update_canvas()
-        self.select_square = None
-        self.update()
+        if self.think_thread:
+            return
+        def on_finish(move):
+            self.board.push(move)
+            if self.board.is_checkmate():
+                self.checkmate = True
+            self.update_canvas()
+            self.select_square = None
+            self.think_thread = None
+        self.think_thread = ThinkThread(self.board, on_finish)
+        self.think_thread.start()
 
     def handle_click(self, event: tk.Event):
         if self.checkmate:
@@ -141,8 +181,8 @@ class Application(tk.Frame):
         return chess.SQUARES_180[square]
 
     def update_canvas(self) -> None:
-        for id in self.pieces + self.boxs:
-            self.canvas.delete(id)
+        self.canvas.delete("all")
+        self.canvas.create_image(0, 0, image=self.resources["bg"], anchor="nw")
         for square in chess.SQUARES_IN_BOARD:
             piece = self.board.piece_at(square)
             if piece:
@@ -154,6 +194,7 @@ class Application(tk.Frame):
 
         if self.checkmate:
             self.canvas.create_image(0, 0, image=self.resources["checkmate"], anchor="nw")
+        self.canvas.update()
 
 
 if __name__ == "__main__":

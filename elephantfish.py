@@ -438,5 +438,4 @@ def best_move(board:chess.Board, think_time=3):
     if board.turn == chess.BLACK:
         from_square = 255 - from_square - 1
         to_square = 255 - to_square - 1
-    print(chess.Move(from_square, to_square))
     return chess.Move(from_square, to_square)

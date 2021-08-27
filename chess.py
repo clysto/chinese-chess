@@ -1006,6 +1006,8 @@ class Board(BaseBoard):
         ])
 
     def pop(self) -> Move:
+        if not len(self.move_stack):
+            return None
         move = self.move_stack.pop()
         self._stack.pop().restore(self)
         return move
