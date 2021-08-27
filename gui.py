@@ -42,6 +42,7 @@ class Application(tk.Frame):
     board: chess.Board
     checkmate: bool = False
     think_thread: ThinkThread = None
+    rotate = False
 
     def __init__(self, master: tk.Tk = None) -> None:
         super().__init__(master)
@@ -80,11 +81,17 @@ class Application(tk.Frame):
             self, bg="white", height=420, width=380, highlightthickness=0
         )
         self.canvas.bind("<Button-1>", self.handle_click)
+        self.button0 = tk.Button(self, text="翻转棋盘", command=self.rotate_board)
         self.button1 = tk.Button(self, text="悔棋", command=self.pop)
         self.button2 = tk.Button(self, text="重新开始", command=self.reset)
         self.canvas.pack()
+        self.button0.pack(side="left", pady=10)
         self.button1.pack(side="left", pady=10)
         self.button2.pack(side="left", pady=10)
+
+    def rotate_board(self):
+        self.rotate = not self.rotate
+        self.update_canvas()
 
     def reset(self):
         is_reset = messagebox.askokcancel(message="是否重新开始？")
@@ -113,6 +120,7 @@ class Application(tk.Frame):
     def black_move(self):
         if self.think_thread:
             return
+
         def on_finish(move):
             self.board.push(move)
             if self.board.is_checkmate():
@@ -149,7 +157,12 @@ class Application(tk.Frame):
                     else:
                         threading.Thread(target=self.black_move).start()
 
+    def rotate_square(self, square: chess.Square):
+        return 255 - square - 1
+
     def create_piece(self, piece: chess.Piece, square: chess.Square) -> None:
+        if self.rotate:
+            square = self.rotate_square(square)
         x = (
             self.style["start_x"]
             + (chess.square_file(chess.SQUARES_180[square]) - 3) * self.style["space_x"]
@@ -164,6 +177,8 @@ class Application(tk.Frame):
 
     def create_box(self, square: chess.Square, color="blue"):
         box = "box" if color == "blue" else "red_box"
+        if self.rotate:
+            square = self.rotate_square(square)
         x = (
             self.style["start_x"]
             + (chess.square_file(chess.SQUARES_180[square]) - 3) * self.style["space_x"]
@@ -178,6 +193,8 @@ class Application(tk.Frame):
         file = (x - self.style["start_x"]) // self.style["space_x"] + 3
         rank = (y - self.style["start_y"]) // self.style["space_y"] + 3
         square = chess.msb(chess.BB_FILES[file] & chess.BB_RANKS[rank])
+        if self.rotate:
+            return self.rotate_square(chess.SQUARES_180[square])
         return chess.SQUARES_180[square]
 
     def update_canvas(self) -> None:
