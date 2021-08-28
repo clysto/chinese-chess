@@ -7,6 +7,7 @@ from elephantfish import best_move
 from PIL import Image, ImageTk
 
 THINK_TIME = 5
+FEN = "3k5/4a4/9/4c4/4N4/9/9/4K3c/9/9 w - - 0 1"
 
 
 class PhotoImage(ImageTk.PhotoImage):
@@ -51,7 +52,7 @@ class Application(tk.Frame):
         self.master.title("中国象棋")
         self.master.resizable(False, False)
         self.pack()
-        self.board = chess.Board()
+        self.board = chess.Board(FEN)
         self.create_widgets()
         self.update_canvas()
 
@@ -117,26 +118,10 @@ class Application(tk.Frame):
             self.board.pop()
         self.update_canvas()
 
-    def black_move(self):
-        if self.think_thread:
-            return
-
-        def on_finish(move):
-            self.board.push(move)
-            if self.board.is_checkmate():
-                self.checkmate = True
-            self.update_canvas()
-            self.select_square = None
-            self.think_thread = None
-        self.think_thread = ThinkThread(self.board, on_finish)
-        self.think_thread.start()
-
     def handle_click(self, event: tk.Event):
-        if self.checkmate or self.board.turn == chess.BLACK:
-            return
         square = self.get_click_square(event.x, event.y)
         piece = self.board.piece_at(square)
-        if piece and self.board.color_at(square) == chess.RED and self.board.turn == chess.RED:
+        if piece and self.board.color_at(square) == self.board.turn:
             for id in self.boxs:
                 self.canvas.delete(id)
             self.moves.clear()
@@ -154,8 +139,6 @@ class Application(tk.Frame):
                     if self.board.is_checkmate():
                         self.checkmate = True
                         self.update_canvas()
-                    else:
-                        threading.Thread(target=self.black_move).start()
 
     def rotate_square(self, square: chess.Square):
         return 255 - square - 1

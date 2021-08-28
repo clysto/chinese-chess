@@ -89,6 +89,7 @@ BB_BLACK_SIDE = 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_0000_0000_0000_0000_00
 
 
 def print_bitboard(bb: Bitboard) -> None:
+    bb = bb & (2**256 - 1)
     s = format(bb, '0256b').replace("1", "@").replace("0", ".")
     for i in range(3, 13):
         print(f"{12-i} " + " ".join(s[i * 16 + 16 - 1 - 3:i * 16 - 1 + 4:-1]))
@@ -346,6 +347,18 @@ def _advisor_attacks() -> List[Bitboard]:
             continue
         attacks.append(_step_attacks(square, [15, 17, -15, -17]) & BB_IN_PALACE)
     return attacks
+
+
+def _knight_blocker(king: Square, knight: Square) -> Bitboard:
+    masks = [BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 15],
+             BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 17],
+             BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 15],
+             BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 17],
+             ]
+    for mask in masks:
+        if BB_KNIGHT_REVERSED_ATTACKS[king][mask] & BB_SQUARES[knight]:
+            return BB_KNIGHT_REVERSED_MASKS[king] & ~mask
+    return BB_EMPTY
 
 
 BB_KNIGHT_MASKS, BB_KNIGHT_ATTACKS = _knight_attacks()
@@ -833,6 +846,14 @@ class Board(BaseBoard):
         else:
             self.set_fen(fen)
 
+    @property
+    def legal_moves(self) -> LegalMoveGenerator:
+        return LegalMoveGenerator(self)
+
+    @property
+    def pseudo_legal_moves(self) -> PseudoLegalMoveGenerator:
+        return PseudoLegalMoveGenerator(self)
+
     def clear(self) -> None:
         self.turn = RED
         self.fullmove_number = 1
@@ -912,41 +933,137 @@ class Board(BaseBoard):
             current_state.restore(self)
             return True
 
-    def _slider_blockers(self, king: Square) -> Bitboard:
-        sliders = self.rooks | self.kings | self.cannons
+    def _is_safe2(self, king: Square, slider_blockers: List[Tuple[Bitboard, Bitboard]],
+                  knight_blockers: List[Tuple(Bitboard, Bitboard)], move: Move) -> bool:
 
-        snipers = _rook_attacks(king, BB_EMPTY) & sliders
+        if move.from_square == king:
+            # 把将去掉
+            return not bool(self._attackers_mask(not self.turn, move.to_square, self.occupied & ~BB_SQUARES[king]))
 
-        blockers = BB_EMPTY
+        bb_from = BB_SQUARES[move.from_square]
+        bb_to = BB_SQUARES[move.to_square]
 
-        for sniper in scan_reversed(snipers & self.occupied_co[not self.turn]):
-            b = between(king, sniper) & self.occupied
+        for blocker, to in knight_blockers:
+            # 如果正在移动马腿棋子
+            if blocker & bb_from and (not bb_to & to):
+                return False
 
-            if BB_SQUARES[sniper] & self.cannons:
-                # 如果路线上只有两个棋子则是一个 blocker
-                if b and count_ones(b) == 2:
-                    blockers |= b
-            else:
-                # 如果路线上只有一个棋子则是一个 blocker
-                if b and BB_SQUARES[msb(b)] == b:
-                    blockers |= b
+        for mask, sniper, limit in slider_blockers:
+            # 如果正在移动阻挡棋子
+            if mask & bb_from or mask & bb_to:
+                if not (sniper & bb_to) and count_ones(self.occupied & mask & ~bb_from | bb_to & mask) == limit:
+                    return False
 
-        return blockers & self.occupied_co[self.turn]
+        return True
 
-    def _knight_blockers(self, king: Square) -> Bitboard:
+    def is_pseudo_legal(self, move: Move) -> bool:
+        if not move:
+            return False
+
+        # 必须有棋子
+        piece = self.piece_type_at(move.from_square)
+        if not piece:
+            return False
+
+        from_mask = BB_SQUARES[move.from_square]
+        to_mask = BB_SQUARES[move.to_square]
+
+        # 是否是自己的棋子
+        if not self.occupied_co[self.turn] & from_mask:
+            return False
+
+        # 目标格子不能有自己的棋子
+        if self.occupied_co[self.turn] & to_mask:
+            return False
+
+        return bool(self.attacks_mask(move.from_square) & to_mask)
+
+    def is_legal(self, move: Move) -> bool:
+        return self.is_pseudo_legal(move) and self._is_safe(move)
+
+    def _slider_blockers(self, king: Square) -> List[Tuple[Bitboard, Bitboard, int]]:
+        rays = _rook_attacks(king, BB_EMPTY)
+        cannons = rays & self.cannons & self.occupied_co[not self.turn]
+        rooks_and_kings = rays & (self.kings | self.rooks) & self.occupied_co[not self.turn]
+
+        blockers = []
+
+        for sniper in scan_reversed(cannons):
+            mask = between(king, sniper)
+            b = mask & self.occupied
+            # 如果路线上只有两个棋子
+            if count_ones(b) == 2:
+                blockers.append((mask, BB_SQUARES[sniper], 1))
+            # 空头炮
+            elif count_ones(b) == 0:
+                blockers.append((mask, BB_SQUARES[sniper], 1))
+
+        for sniper in scan_reversed(rooks_and_kings):
+            mask = between(king, sniper)
+            b = mask & self.occupied
+            # 如果路线上只有一个棋子则是一个 blocker
+            if b and count_ones(b) == 1:
+                blockers.append((mask, BB_SQUARES[sniper], 0))
+
+        return blockers
+
+    def _knight_blockers(self, king: Square) -> List[Tuple(Bitboard, Bitboard)]:
+        # 生成正在别马脚的棋子
         knights = self.knights & self.occupied_co[not self.turn]
         blockers = BB_EMPTY
-        occupied = BB_KNIGHT_REVERSED_MASKS[king] & self.occupied
+        blockers_detail = []
+        occupied = BB_KNIGHT_REVERSED_MASKS[king] & self.occupied_co[self.turn]
         masks = [BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 15],
                  BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 17],
                  BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 15],
                  BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 17],
                  ]
         for mask in masks:
-            if (occupied & ~mask) and BB_KNIGHT_REVERSED_ATTACKS[king][mask] & knights:
+            attack_knights = BB_KNIGHT_REVERSED_ATTACKS[king][mask] & knights
+            if attack_knights and (occupied & ~mask):
                 blockers |= (occupied & ~mask)
+                if count_ones(attack_knights) == 1:
+                    blockers_detail.append((occupied & ~mask, attack_knights))
+                else:
+                    blockers_detail.append((occupied & ~mask, BB_EMPTY))
 
-        return blockers & self.occupied_co[self.turn]
+        return blockers_detail
+
+    def _generate_evasions(self, king: Square, checkers: Bitboard,
+                           from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD) -> Iterator[Move]:
+
+        attacked = BB_EMPTY
+        for checker in scan_reversed(checkers & self.rooks):
+            attacked |= line(king, checker) & ~BB_SQUARES[checker]
+
+        for checker in scan_reversed(checkers & self.cannons):
+            middle = between(king, checker) & self.occupied
+            l = between(middle, checker) | middle | checker
+            attacked |= line(king, checker) & ~l & ~BB_SQUARES[checker]
+
+        if BB_SQUARES[king] & from_mask:
+            print_bitboard(BB_KING_ATTACKS[king] & ~self.occupied_co[self.turn] & ~attacked & to_mask)
+            for to_square in scan_reversed(BB_KING_ATTACKS[king] & ~self.occupied_co[self.turn] & ~attacked & to_mask):
+                yield Move(king, to_square)
+
+        if count_ones(checkers) == 1:
+            # 只有一个子将
+            checker = msb(checkers)
+            if checkers & self.rooks:
+                target = between(king, checker) | checkers
+                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, target & to_mask)
+            elif checkers & self.cannons:
+                target = between(king, checker) | checkers
+                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask & ~target, target & to_mask)
+                # 拆炮架
+                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask & target, ~target & to_mask)
+            elif checkers & self.knights:
+                # 别马腿
+                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, _knight_blocker(king, checker) & to_mask)
+
+        else:
+            # TODO:车炮双将
+            pass
 
     def generate_pseudo_legal_moves(self, from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD) -> Iterator[Move]:
         our_pieces = self.occupied_co[self.turn]
@@ -967,9 +1084,17 @@ class Board(BaseBoard):
         king_mask = self.kings & self.occupied_co[self.turn]
         if king_mask:
             king = msb(king_mask)
-            for move in self.generate_pseudo_legal_moves(from_mask, to_mask):
-                if self._is_safe(move):
-                    yield move
+            slider_blockers = self._slider_blockers(king)
+            knight_blockers = self._knight_blockers(king)
+            checkers = self.attackers_mask(not self.turn, king)
+            if checkers:
+                for move in self._generate_evasions(king, checkers, from_mask, to_mask):
+                    if self._is_safe2(king, slider_blockers, knight_blockers, move):
+                        yield move
+            else:
+                for move in self.generate_pseudo_legal_moves(from_mask, to_mask):
+                    if self._is_safe2(king, slider_blockers, knight_blockers, move):
+                        yield move
         else:
             yield from self.generate_pseudo_legal_moves(from_mask, to_mask)
 
@@ -1021,4 +1146,57 @@ class Board(BaseBoard):
     def push_iccs(self, iccs: str):
         # TODO:检查合法
         move = Move.from_iccs(iccs)
-        self.push(move)
+        if move in self.generate_legal_moves():
+            self.push(move)
+
+
+class PseudoLegalMoveGenerator:
+
+    def __init__(self, board: Board) -> None:
+        self.board = board
+
+    def __bool__(self) -> bool:
+        return any(self.board.generate_pseudo_legal_moves())
+
+    def count(self) -> int:
+        return len(list(self))
+
+    def __iter__(self) -> Iterator[Move]:
+        return self.board.generate_pseudo_legal_moves()
+
+    def __contains__(self, move: Move) -> bool:
+        return self.board.is_pseudo_legal(move)
+
+    def __repr__(self) -> str:
+        builder = []
+
+        for move in self:
+            if self.board.is_legal(move):
+                builder.append(self.board.san(move))
+            else:
+                builder.append(self.board.uci(move))
+
+        sans = ", ".join(builder)
+        return f"<PseudoLegalMoveGenerator at {id(self):#x} ({sans})>"
+
+
+class LegalMoveGenerator:
+
+    def __init__(self, board: Board) -> None:
+        self.board = board
+
+    def __bool__(self) -> bool:
+        return any(self.board.generate_legal_moves())
+
+    def count(self) -> int:
+        return len(list(self))
+
+    def __iter__(self) -> Iterator[Move]:
+        return self.board.generate_legal_moves()
+
+    def __contains__(self, move: Move) -> bool:
+        return self.board.is_legal(move)
+
+    def __repr__(self) -> str:
+        sans = ", ".join(self.board.san(move) for move in self)
+        return f"<LegalMoveGenerator at {id(self):#x} ({sans})>"
