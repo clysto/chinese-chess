@@ -6,7 +6,7 @@ from typing import Callable, Dict, List, Optional
 from elephantfish import best_move
 from PIL import Image, ImageTk
 
-THINK_TIME = 1
+THINK_TIME = 5
 
 
 class PhotoImage(ImageTk.PhotoImage):
@@ -132,7 +132,7 @@ class Application(tk.Frame):
         self.think_thread.start()
 
     def handle_click(self, event: tk.Event):
-        if self.checkmate:
+        if self.checkmate or self.board.turn == chess.BLACK:
             return
         square = self.get_click_square(event.x, event.y)
         piece = self.board.piece_at(square)
