@@ -1,7 +1,9 @@
 from __future__ import print_function
 import sys, time
+import threading
 from itertools import count
 from collections import namedtuple
+from typing import Callable
 import chess
 
 piece = { 'P': 44, 'N': 108, 'B': 23, 'R': 233, 'A': 23, 'C': 101, 'K': 2500}
@@ -148,7 +150,7 @@ TABLE_SIZE = 1e7
 QS_LIMIT = 219
 EVAL_ROUGHNESS = 13
 DRAW_TEST = False
-THINK_TIME = 5
+THINK_TIME = 2
 
 ###############################################################################
 # Chess logic
@@ -439,3 +441,19 @@ def best_move(board:chess.Board, think_time=3):
         from_square = 255 - from_square - 1
         to_square = 255 - to_square - 1
     return chess.Move(from_square, to_square)
+
+class ThinkThread(threading.Thread):
+    def __init__(self, board: chess.Board, think_time:int, on_finish: Callable):
+        threading.Thread.__init__(self)
+        self.board = board
+        self.think_time = think_time
+        self.on_finish = on_finish
+
+    def run(self):
+        move = best_move(self.board, self.think_time)
+        print("computer move:" + str(move))
+        if self.on_finish:
+            self.on_finish(move)
+
+    def stop(self):
+        self.on_finish = None

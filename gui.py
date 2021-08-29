@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
-import chess
 import tkinter as tk
 from tkinter import messagebox
-import threading
-from typing import Callable, Dict, List, Optional
-from elephantfish import best_move
+from typing import Dict
+
 from PIL import Image, ImageTk
 
-THINK_TIME = 5
-# FEN = chess.STARTING_FEN
-FEN = "5k3/9/5N3/9/9/8C/9/9/9/3K5 w - - 0 1"
+import chess
+from elephantfish import ThinkThread
+
+
+FEN = chess.STARTING_FEN
+SELF_PLAY, COMPUTER_PLAY = 1, 2
 
 
 class PhotoImage(ImageTk.PhotoImage):
@@ -25,30 +26,14 @@ class PhotoImage(ImageTk.PhotoImage):
         return cls(im)
 
 
-class ThinkThread(threading.Thread):
-    def __init__(self, board: chess.Board, on_finish: Callable):
-        threading.Thread.__init__(self)
-        self.board = board
-        self.on_finish = on_finish
-
-    def run(self):
-        move = best_move(self.board, think_time=THINK_TIME)
-        print("computer move:" + str(move))
-        if self.on_finish:
-            self.on_finish(move)
-
-    def stop(self):
-        self.on_finish = None
-
-
 class Application(tk.Frame):
 
     resources: Dict[str, PhotoImage]
     style = {"start_x": 15, "start_y": 15, "space_x": 60, "space_y": 60}
-    boxs = []
-    select_square: Optional[chess.Square] = None
+    select_square: chess.Square = None
     board: chess.Board
     rotate = False
+    mode = SELF_PLAY
 
     def __init__(self) -> None:
         self.master = tk.Tk()
@@ -57,9 +42,8 @@ class Application(tk.Frame):
         self.master.title("中国象棋")
         self.master.resizable(False, False)
         self.pack()
-        self.board = chess.Board(FEN)
         self.create_widgets()
-        self.update_canvas()
+        self.reset()
 
     def load_resources(self) -> None:
         self.resources = {}
@@ -68,58 +52,114 @@ class Application(tk.Frame):
         for offset, piece in enumerate(all_pieces):
             self.resources[piece] = PhotoImage.open_and_crop("./assets/pieces.png", 0, offset * 60, 60, 60)
         self.resources["checkmate"] = PhotoImage.open("./assets/checkmate.png")
+        self.resources["check"] = PhotoImage.open("./assets/check.png")
 
     def create_widgets(self) -> None:
-        self.canvas = tk.Canvas(
-            self, bg="white", height=630, width=570, highlightthickness=0
-        )
+        self.canvas = tk.Canvas(self, bg="white", height=630, width=570, highlightthickness=0)
         self.canvas.bind("<Button-1>", self.handle_click)
         self.button0 = tk.Button(self, text="翻转棋盘", command=self.rotate_board)
         self.button1 = tk.Button(self, text="悔棋", command=self.pop)
-        self.button2 = tk.Button(self, text="重新开始", command=self.reset)
+        self.button2 = tk.Button(self, text="自我对战", command=self.confirm_reset)
+        self.button3 = tk.Button(self, text="人机对战", command=self.show_options)
         self.canvas.pack()
         self.button0.pack(side="left", pady=10)
         self.button1.pack(side="left", pady=10)
         self.button2.pack(side="left", pady=10)
+        self.button3.pack(side="left", pady=10)
 
-    def rotate_board(self):
+    def show_options(self) -> None:
+        self.options_frame = tk.Toplevel(self, borderwidth=20)
+        self.options_frame.resizable(False, False)
+        self.computer_side = tk.BooleanVar(self)
+        label = tk.Label(self.options_frame, text="电脑")
+        label.grid(row=0, column=0)
+        red_button = tk.Radiobutton(self.options_frame, text="红", variable=self.computer_side, value=chess.RED)
+        red_button.grid(row=0, column=1)
+        black_button = tk.Radiobutton(self.options_frame, text="黑", variable=self.computer_side, value=chess.BLACK)
+        black_button.select()
+        black_button.grid(row=0, column=2)
+        start_button = tk.Button(self.options_frame, text="开始挑战", command=self.start_game)
+        start_button.grid(row=1, column=0, columnspan=3)
+
+    def start_game(self) -> None:
+        self.options_frame.destroy()
+        self.mode = COMPUTER_PLAY
+        self.reset()
+        if self.computer_side.get() == chess.RED:
+            self.rotate = True
+            self.update_canvas()
+            self.computer_move()
+
+    def rotate_board(self) -> None:
         self.rotate = not self.rotate
         self.update_canvas()
 
-    def reset(self):
+    def confirm_reset(self) -> None:
         is_reset = messagebox.askokcancel(message="是否重新开始？")
         if not is_reset:
             return
+        self.mode = SELF_PLAY
+        self.reset()
+
+    def reset(self) -> None:
         self.board = chess.Board()
-        self.boxs.clear()
         self.select_square = None
         self.update_canvas()
 
-    def pop(self):
+    def pop(self) -> None:
         if self.board.is_checkmate():
             return
+        if self.mode == COMPUTER_PLAY and self.board.turn == self.computer_side.get():
+            # 电脑思考时不能悔棋
+            return
+        if self.mode == COMPUTER_PLAY:
+            self.board.pop()
         self.board.pop()
+        self.select_square = None
         self.update_canvas()
 
-    def handle_click(self, event: tk.Event):
+    def computer_move(self) -> None:
+        def on_finish(move):
+            self.push(move)
+        ThinkThread(self.board, 1, on_finish).start()
+
+    def handle_click(self, event: tk.Event) -> None:
         if self.board.is_checkmate():
             return
         square = self.get_click_square(event.x, event.y)
         piece = self.board.piece_at(square)
-        if piece and self.board.color_at(square) == self.board.turn:
+
+        if self.mode == SELF_PLAY:
+            my_color = self.board.turn
+        else:
+            my_color = not self.computer_side.get()
+
+        if piece and self.board.color_at(square) == my_color and my_color == self.board.turn:
             self.select_square = square
             self.update_canvas()
-        else:
-            if self.select_square:
-                move = chess.Move(self.select_square, square)
-                if move in self.board.legal_moves:
-                    self.board.push(move)
-                    self.select_square = None
-                    self.update_canvas()
-                    if self.board.is_checkmate():
-                        self.update_canvas()
+        elif self.select_square:
+            move = chess.Move(self.select_square, square)
+            if move in self.board.legal_moves:
+                self.push(move)
+                if self.mode == COMPUTER_PLAY:
+                    self.computer_move()
 
-    def rotate_square(self, square: chess.Square):
+    def push(self, move: chess.Move):
+        self.board.push(move)
+        self.select_square = None
+        self.update_canvas()
+        if self.board.is_checkmate():
+            self.update_canvas()
+        elif self.board.is_check():
+            self.update_canvas()
+            check_image = self.canvas.create_image(0, 0, image=self.resources["check"], anchor="nw")
+
+            def delete_check_image():
+                self.canvas.delete(check_image)
+
+            self.canvas.after(500, delete_check_image)
+
+    def rotate_square(self, square: chess.Square) -> chess.Square:
         return 255 - square - 1
 
     def create_piece(self, piece: chess.Piece, square: chess.Square) -> None:
@@ -133,9 +173,7 @@ class Application(tk.Frame):
             self.style["start_y"]
             + (chess.square_rank(chess.SQUARES_180[square]) - 3) * self.style["space_y"]
         )
-        return self.canvas.create_image(
-            x, y, image=self.resources[piece.symbol()], anchor="nw"
-        )
+        self.canvas.create_image(x, y, image=self.resources[piece.symbol()], anchor="nw")
 
     def create_box(self, square: chess.Square, color="blue"):
         box = "blue_box" if color == "blue" else "red_box"
@@ -149,7 +187,7 @@ class Application(tk.Frame):
             self.style["start_y"]
             + (chess.square_rank(chess.SQUARES_180[square]) - 3) * self.style["space_y"]
         )
-        return self.canvas.create_image(x, y, image=self.resources[box], anchor="nw")
+        self.canvas.create_image(x, y, image=self.resources[box], anchor="nw")
 
     def get_click_square(self, x: int, y: int) -> chess.Square:
         file = (x - self.style["start_x"]) // self.style["space_x"] + 3
