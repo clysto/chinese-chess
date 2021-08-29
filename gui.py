@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import chess
 import tkinter as tk
 from tkinter import messagebox
@@ -7,13 +9,20 @@ from elephantfish import best_move
 from PIL import Image, ImageTk
 
 THINK_TIME = 5
-FEN = "3k5/4a4/9/4c4/4N4/9/9/4K3c/9/9 w - - 0 1"
+# FEN = chess.STARTING_FEN
+FEN = "5k3/9/5N3/9/9/8C/9/9/9/3K5 w - - 0 1"
 
 
 class PhotoImage(ImageTk.PhotoImage):
     @classmethod
     def open(cls, fp):
         return cls(Image.open(fp))
+
+    @classmethod
+    def open_and_crop(cls, fp, x, y, w, h):
+        im = Image.open(fp)
+        im = im.crop((x, y, x + w, y + h))
+        return cls(im)
 
 
 class ThinkThread(threading.Thread):
@@ -35,20 +44,16 @@ class ThinkThread(threading.Thread):
 class Application(tk.Frame):
 
     resources: Dict[str, PhotoImage]
-    style = {"start_x": 10, "start_y": 10, "space_x": 40, "space_y": 40}
+    style = {"start_x": 15, "start_y": 15, "space_x": 60, "space_y": 60}
     boxs = []
-    pieces = []
     select_square: Optional[chess.Square] = None
-    moves: List[chess.Move] = []
     board: chess.Board
-    checkmate: bool = False
-    think_thread: ThinkThread = None
     rotate = False
 
-    def __init__(self, master: tk.Tk = None) -> None:
-        super().__init__(master)
+    def __init__(self) -> None:
+        self.master = tk.Tk()
+        super().__init__(self.master)
         self.load_resources()
-        self.master = master
         self.master.title("中国象棋")
         self.master.resizable(False, False)
         self.pack()
@@ -59,27 +64,14 @@ class Application(tk.Frame):
     def load_resources(self) -> None:
         self.resources = {}
         self.resources["bg"] = PhotoImage.open("./assets/board.jpg")
-        self.resources["A"] = PhotoImage.open("./assets/ra.png")
-        self.resources["B"] = PhotoImage.open("./assets/rb.png")
-        self.resources["K"] = PhotoImage.open("./assets/rk.png")
-        self.resources["N"] = PhotoImage.open("./assets/rn.png")
-        self.resources["C"] = PhotoImage.open("./assets/rc.png")
-        self.resources["P"] = PhotoImage.open("./assets/rp.png")
-        self.resources["R"] = PhotoImage.open("./assets/rr.png")
-        self.resources["a"] = PhotoImage.open("./assets/ba.png")
-        self.resources["b"] = PhotoImage.open("./assets/bb.png")
-        self.resources["k"] = PhotoImage.open("./assets/bk.png")
-        self.resources["n"] = PhotoImage.open("./assets/bn.png")
-        self.resources["c"] = PhotoImage.open("./assets/bc.png")
-        self.resources["p"] = PhotoImage.open("./assets/bp.png")
-        self.resources["r"] = PhotoImage.open("./assets/br.png")
-        self.resources["box"] = PhotoImage.open("./assets/ns.png")
-        self.resources["red_box"] = PhotoImage.open("./assets/nr.png")
+        all_pieces = ["R", "N", "B", "A", "K", "C", "P", "r", "n", "b", "a", "k", "c", "p", "red_box", "blue_box"]
+        for offset, piece in enumerate(all_pieces):
+            self.resources[piece] = PhotoImage.open_and_crop("./assets/pieces.png", 0, offset * 60, 60, 60)
         self.resources["checkmate"] = PhotoImage.open("./assets/checkmate.png")
 
     def create_widgets(self) -> None:
         self.canvas = tk.Canvas(
-            self, bg="white", height=420, width=380, highlightthickness=0
+            self, bg="white", height=630, width=570, highlightthickness=0
         )
         self.canvas.bind("<Button-1>", self.handle_click)
         self.button0 = tk.Button(self, text="翻转棋盘", command=self.rotate_board)
@@ -98,46 +90,33 @@ class Application(tk.Frame):
         is_reset = messagebox.askokcancel(message="是否重新开始？")
         if not is_reset:
             return
-        if self.think_thread:
-            self.think_thread.stop()
         self.board = chess.Board()
         self.boxs.clear()
-        self.moves.clear()
-        self.pieces.clear()
         self.select_square = None
-        self.checkmate = False
         self.update_canvas()
 
     def pop(self):
-        if self.checkmate:
+        if self.board.is_checkmate():
             return
-        if self.think_thread:
-            self.think_thread.stop()
         self.board.pop()
-        if self.board.turn == chess.BLACK:
-            self.board.pop()
         self.update_canvas()
 
     def handle_click(self, event: tk.Event):
+        if self.board.is_checkmate():
+            return
         square = self.get_click_square(event.x, event.y)
         piece = self.board.piece_at(square)
         if piece and self.board.color_at(square) == self.board.turn:
-            for id in self.boxs:
-                self.canvas.delete(id)
-            self.moves.clear()
             self.select_square = square
-            self.boxs.append(self.create_box(square, color="red"))
-            for m in self.board.generate_legal_moves(chess.BB_SQUARES[square]):
-                self.moves.append(m)
-                self.boxs.append(self.create_box(m.to_square))
+            self.update_canvas()
         else:
             if self.select_square:
                 move = chess.Move(self.select_square, square)
-                if move in self.moves:
+                if move in self.board.legal_moves:
                     self.board.push(move)
+                    self.select_square = None
                     self.update_canvas()
                     if self.board.is_checkmate():
-                        self.checkmate = True
                         self.update_canvas()
 
     def rotate_square(self, square: chess.Square):
@@ -159,7 +138,7 @@ class Application(tk.Frame):
         )
 
     def create_box(self, square: chess.Square, color="blue"):
-        box = "box" if color == "blue" else "red_box"
+        box = "blue_box" if color == "blue" else "red_box"
         if self.rotate:
             square = self.rotate_square(square)
         x = (
@@ -186,18 +165,22 @@ class Application(tk.Frame):
         for square in chess.SQUARES_IN_BOARD:
             piece = self.board.piece_at(square)
             if piece:
-                self.pieces.append(self.create_piece(piece, square))
+                self.create_piece(piece, square)
         last_move = self.board.peek()
-        if last_move:
-            self.boxs.append(self.create_box(last_move.from_square))
-            self.boxs.append(self.create_box(last_move.to_square))
 
-        if self.checkmate:
+        if self.select_square:
+            self.create_box(self.select_square, color="red")
+            for move in filter(lambda x: x.from_square == self.select_square, self.board.legal_moves):
+                self.create_box(move.to_square)
+
+        elif last_move:
+            self.create_box(last_move.from_square)
+            self.create_box(last_move.to_square)
+
+        if self.board.is_checkmate():
             self.canvas.create_image(0, 0, image=self.resources["checkmate"], anchor="nw")
-        self.canvas.update()
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = Application(master=root)
+    app = Application()
     app.mainloop()
