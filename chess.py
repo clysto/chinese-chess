@@ -61,6 +61,13 @@ def square_file(square: Square) -> int:
     return square & 0xf
 
 
+def square_file_wxf(square: Square, color: Color) -> int:
+    if color == BLACK:
+        return square_file(square) - 2
+    else:
+        return 10 - (square_file(square) - 2)
+
+
 def square_rank(square: Square) -> int:
     return square >> 4
 
@@ -188,7 +195,7 @@ def between(a: Square, b: Square) -> Bitboard:
     return bb & (bb - 1)
 
 
-def line(a: Square, b: Square):
+def line(a: Square, b: Square) -> Bitboard:
     file_a, file_b = square_file(a), square_file(b)
     rank_a, rank_b = square_rank(a), square_rank(b)
     if file_a == file_b:
@@ -733,7 +740,8 @@ class BaseBoard:
         elif bb_square & self.rooks:
             return _rook_attacks(square, self.occupied)
         elif bb_square & self.cannons:
-            return _cannon_attacks(square, self.occupied)
+            return (_cannon_attacks(square, self.occupied) |
+                    (_rook_attacks(square, self.occupied) & ~self.occupied))
         else:
             return BB_EMPTY
 
@@ -922,19 +930,8 @@ class Board(BaseBoard):
             return False
         return not any(self.generate_legal_moves())
 
-    def _is_safe(self, move: Move) -> bool:
-        current_state = self._board_state()
-        piece_type = self._remove_piece_at(move.from_square)
-        self._set_piece_at(move.to_square, piece_type, self.turn)
-        if self.is_check():
-            current_state.restore(self)
-            return False
-        else:
-            current_state.restore(self)
-            return True
-
-    def _is_safe2(self, king: Square, slider_blockers: List[Tuple[Bitboard, Bitboard]],
-                  knight_blockers: List[Tuple(Bitboard, Bitboard)], move: Move) -> bool:
+    def _is_safe(self, king: Square, slider_blockers: List[Tuple[Bitboard, Bitboard]],
+                 knight_blockers: List[Tuple(Bitboard, Bitboard)], move: Move) -> bool:
 
         if move.from_square == king:
             # 把将去掉
@@ -959,7 +956,6 @@ class Board(BaseBoard):
     def is_pseudo_legal(self, move: Move) -> bool:
         if not move:
             return False
-
         # 必须有棋子
         piece = self.piece_type_at(move.from_square)
         if not piece:
@@ -979,7 +975,18 @@ class Board(BaseBoard):
         return bool(self.attacks_mask(move.from_square) & to_mask)
 
     def is_legal(self, move: Move) -> bool:
-        return self.is_pseudo_legal(move) and self._is_safe(move)
+        return self.is_pseudo_legal(move) and not self.is_into_check(move)
+
+    def is_into_check(self, move: Move) -> bool:
+        king = self.king(self.turn)
+        if king is None:
+            return False
+
+        checkers = self.attackers_mask(not self.turn, king)
+        if checkers and move not in self._generate_evasions(king, checkers, BB_SQUARES[move.from_square], BB_SQUARES[move.to_square]):
+            return True
+
+        return not self._is_safe(king, self._slider_blockers(king), self._knight_blockers(king), move)
 
     def _slider_blockers(self, king: Square) -> List[Tuple[Bitboard, Bitboard, int]]:
         rays = _rook_attacks(king, BB_EMPTY)
@@ -1042,14 +1049,13 @@ class Board(BaseBoard):
             attacked |= line(king, checker) & ~l & ~BB_SQUARES[checker]
 
         if BB_SQUARES[king] & from_mask:
-            print_bitboard(BB_KING_ATTACKS[king] & ~self.occupied_co[self.turn] & ~attacked & to_mask)
             for to_square in scan_reversed(BB_KING_ATTACKS[king] & ~self.occupied_co[self.turn] & ~attacked & to_mask):
                 yield Move(king, to_square)
 
         if count_ones(checkers) == 1:
             # 只有一个子将
             checker = msb(checkers)
-            if checkers & self.rooks:
+            if checkers & (self.rooks | self.kings):
                 target = between(king, checker) | checkers
                 yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, target & to_mask)
             elif checkers & self.cannons:
@@ -1061,9 +1067,12 @@ class Board(BaseBoard):
                 # 别马腿
                 yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, _knight_blocker(king, checker) & to_mask)
 
-        else:
-            # TODO:车炮双将
-            pass
+        elif count_ones(checkers) == 2:
+            # 车炮双将
+            cannon_checker = msb(checkers & self.cannons)
+            rook_checker = msb(checkers & self.rooks)
+            if line(cannon_checker, rook_checker) & BB_SQUARES[king] and not (between(cannon_checker, rook_checker) & BB_SQUARES[king]):
+                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, between(king, cannon_checker) & to_mask)
 
     def generate_pseudo_legal_moves(self, from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD) -> Iterator[Move]:
         our_pieces = self.occupied_co[self.turn]
@@ -1071,12 +1080,6 @@ class Board(BaseBoard):
         from_squares = our_pieces & from_mask
         for from_square in scan_reversed(from_squares):
             moves = self.attacks_mask(from_square) & ~our_pieces & to_mask
-            for to_square in scan_reversed(moves):
-                yield Move(from_square, to_square)
-
-        # 炮不吃子着法
-        for from_square in scan_reversed(from_squares & self.cannons):
-            moves = _sliding_attacks(from_square, self.occupied, [16, -16, -1, 1]) & ~self.occupied & to_mask
             for to_square in scan_reversed(moves):
                 yield Move(from_square, to_square)
 
@@ -1089,11 +1092,11 @@ class Board(BaseBoard):
             checkers = self.attackers_mask(not self.turn, king)
             if checkers:
                 for move in self._generate_evasions(king, checkers, from_mask, to_mask):
-                    if self._is_safe2(king, slider_blockers, knight_blockers, move):
+                    if self._is_safe(king, slider_blockers, knight_blockers, move):
                         yield move
             else:
                 for move in self.generate_pseudo_legal_moves(from_mask, to_mask):
-                    if self._is_safe2(king, slider_blockers, knight_blockers, move):
+                    if self._is_safe(king, slider_blockers, knight_blockers, move):
                         yield move
         else:
             yield from self.generate_pseudo_legal_moves(from_mask, to_mask)
@@ -1149,6 +1152,67 @@ class Board(BaseBoard):
         if move in self.generate_legal_moves():
             self.push(move)
 
+    def wxf(self, move: Move):
+        from_square = move.from_square
+        to_square = move.to_square
+        from_square_file = square_file(from_square)
+        from_file_wxf = square_file_wxf(from_square, self.turn)
+        to_file_wxf = square_file_wxf(to_square, self.turn)
+        piece = self.piece_type_at(from_square)
+        result = ""
+        plus_symbol = "+" if self.turn == RED else "-"
+        minus_symbol = "-" if self.turn == RED else "+"
+        chars = ["a", "b", "c", "d", "e"]
+
+        # 相象仕士
+        if piece == ADVISOR or piece == BISHOP:
+            result += PIECE_SYMBOLS[piece] + str(from_file_wxf)
+
+        # 兵卒
+        elif (piece == PAWN):
+            other = self.pieces_mask(piece, self.turn) & BB_FILES[from_square_file] & ~BB_SQUARES[from_square]
+            if not other:
+                result += PIECE_SYMBOLS[piece] + str(from_file_wxf)
+            else:
+                pawns = []
+                for bb_file in BB_FILES[::-1]:
+                    file_pawns = []
+                    for p in scan_reversed(bb_file & self.pawns & self.occupied_co[self.turn]):
+                        file_pawns.append(p)
+                    if len(file_pawns) > 1:
+                        pawns += file_pawns
+               	if len(pawns) == 2:
+                    result = PIECE_SYMBOLS[piece] + [plus_symbol, minus_symbol][pawns.index(from_square)]
+                elif len(pawns) == 3:
+                    result = PIECE_SYMBOLS[piece] + [plus_symbol,".", minus_symbol][pawns.index(from_square)]
+                else:
+                    if self.turn == RED:
+                        result = PIECE_SYMBOLS[piece] + chars[pawns.index(from_square)]
+                    else:
+                        result = PIECE_SYMBOLS[piece] + chars[pawns[::-1].index(from_square)]
+                    
+        # 车马帅将炮
+        else:
+            other = self.pieces_mask(piece, self.turn) & BB_FILES[from_square_file] & ~BB_SQUARES[from_square]
+            if other:
+                result += PIECE_SYMBOLS[piece] + (plus_symbol if msb(other) < from_square else minus_symbol)
+            else:
+                result += PIECE_SYMBOLS[piece] + str(from_file_wxf)
+
+        # 马相象仕士
+        if piece == KNIGHT or piece == BISHOP or piece == ADVISOR:
+            result += (plus_symbol if from_square < to_square else minus_symbol) + str(to_file_wxf)
+
+        # 车帅将炮兵卒
+        else:
+            offset = count_ones(between(from_square, to_square)) + 1
+            if abs(from_square - to_square) > 15:
+                result += (minus_symbol if from_square > to_square else plus_symbol) + str(offset)
+            else:
+                result += "." + str(to_file_wxf)
+
+        return result
+
 
 class PseudoLegalMoveGenerator:
 
@@ -1172,9 +1236,9 @@ class PseudoLegalMoveGenerator:
 
         for move in self:
             if self.board.is_legal(move):
-                builder.append(self.board.san(move))
+                builder.append(self.board.wxf(move))
             else:
-                builder.append(self.board.uci(move))
+                builder.append(move.iccs())
 
         sans = ", ".join(builder)
         return f"<PseudoLegalMoveGenerator at {id(self):#x} ({sans})>"
@@ -1198,5 +1262,5 @@ class LegalMoveGenerator:
         return self.board.is_legal(move)
 
     def __repr__(self) -> str:
-        sans = ", ".join(self.board.san(move) for move in self)
+        sans = ", ".join(self.board.wxf(move) for move in self)
         return f"<LegalMoveGenerator at {id(self):#x} ({sans})>"
