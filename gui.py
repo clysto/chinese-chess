@@ -69,6 +69,9 @@ class Application(tk.Frame):
 
     def show_options(self) -> None:
         self.options_frame = tk.Toplevel(self, borderwidth=20)
+        x = self.master.winfo_x()
+        y = self.master.winfo_y()
+        self.options_frame.geometry("+%d+%d" % (x + 200, y + 200))
         self.options_frame.resizable(False, False)
         self.computer_side = tk.BooleanVar(self)
         label = tk.Label(self.options_frame, text="电脑")
@@ -80,6 +83,7 @@ class Application(tk.Frame):
         black_button.grid(row=0, column=2)
         start_button = tk.Button(self.options_frame, text="开始挑战", command=self.start_game)
         start_button.grid(row=1, column=0, columnspan=3)
+        self.options_frame.update()
 
     def start_game(self) -> None:
         self.options_frame.destroy()

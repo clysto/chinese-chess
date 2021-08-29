@@ -451,7 +451,7 @@ class ThinkThread(threading.Thread):
 
     def run(self):
         move = best_move(self.board, self.think_time)
-        print("computer move:" + str(move))
+        print("computer move: " + self.board.wxf(move))
         if self.on_finish:
             self.on_finish(move)
 
