@@ -29,7 +29,7 @@ class PhotoImage(ImageTk.PhotoImage):
 class Application(tk.Frame):
 
     resources: Dict[str, PhotoImage]
-    style = {"start_x": 15, "start_y": 15, "space_x": 60, "space_y": 60}
+    style = {"start_x": 15, "start_y": 45, "space_x": 60, "space_y": 60}
     select_square: chess.Square = None
     board: chess.Board
     rotate = False
@@ -47,7 +47,8 @@ class Application(tk.Frame):
 
     def load_resources(self) -> None:
         self.resources = {}
-        self.resources["bg"] = PhotoImage.open("./assets/board.jpg")
+        self.resources["bg"] = PhotoImage.open("./assets/board.png")
+        self.resources["bg_r"] = PhotoImage.open("./assets/board_rotate.png")
         all_pieces = ["R", "N", "B", "A", "K", "C", "P", "r", "n", "b", "a", "k", "c", "p", "red_box", "blue_box"]
         for offset, piece in enumerate(all_pieces):
             self.resources[piece] = PhotoImage.open_and_crop("./assets/pieces.png", 0, offset * 60, 60, 60)
@@ -55,7 +56,7 @@ class Application(tk.Frame):
         self.resources["check"] = PhotoImage.open("./assets/check.png")
 
     def create_widgets(self) -> None:
-        self.canvas = tk.Canvas(self, bg="white", height=630, width=570, highlightthickness=0)
+        self.canvas = tk.Canvas(self, bg="white", height=690, width=570, highlightthickness=0)
         self.canvas.bind("<Button-1>", self.handle_click)
         self.button0 = tk.Button(self, text="翻转棋盘", command=self.rotate_board)
         self.button1 = tk.Button(self, text="悔棋", command=self.pop)
@@ -149,6 +150,7 @@ class Application(tk.Frame):
                     self.computer_move()
 
     def push(self, move: chess.Move):
+        print(self.board.chinese_move(move, full_width=True))
         self.board.push(move)
         self.select_square = None
         self.update_canvas()
@@ -156,7 +158,7 @@ class Application(tk.Frame):
             self.update_canvas()
         elif self.board.is_check():
             self.update_canvas()
-            check_image = self.canvas.create_image(0, 0, image=self.resources["check"], anchor="nw")
+            check_image = self.canvas.create_image(0, 30, image=self.resources["check"], anchor="nw")
 
             def delete_check_image():
                 self.canvas.delete(check_image)
@@ -203,7 +205,10 @@ class Application(tk.Frame):
 
     def update_canvas(self) -> None:
         self.canvas.delete("all")
-        self.canvas.create_image(0, 0, image=self.resources["bg"], anchor="nw")
+        if self.rotate:
+            self.canvas.create_image(0, 0, image=self.resources["bg_r"], anchor="nw")
+        else:
+            self.canvas.create_image(0, 0, image=self.resources["bg"], anchor="nw")
         for square in chess.SQUARES_IN_BOARD:
             piece = self.board.piece_at(square)
             if piece:
@@ -220,7 +225,7 @@ class Application(tk.Frame):
             self.create_box(last_move.to_square)
 
         if self.board.is_checkmate():
-            self.canvas.create_image(0, 0, image=self.resources["checkmate"], anchor="nw")
+            self.canvas.create_image(0, 30, image=self.resources["checkmate"], anchor="nw")
 
 
 if __name__ == "__main__":

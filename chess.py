@@ -21,13 +21,16 @@ PIECES_NAMES = {
     "C": "炮", "c": "砲",
 }
 
+ACTION_NAMES = {".": "平", "+": "进", "-": "退"}
+POSITION_NAMES = {".": "中", "+": "前", "-": "后", "a": "一", "b": "二", "c": "三", "d": "四", "e": "五"}
+
 
 def piece_symbol(piece_type: PieceType) -> str:
     return typing.cast(str, PIECE_SYMBOLS[piece_type])
 
 
 FILE_NAMES = [None, None, None, "a", "b", "c", "d", "e", "f", "g", "h", "i", None, None, None, None]
-
+CHINESE_NUMBERS = [None, "一", "二", "三", "四", "五", "六", "七", "八", "九"]
 RANK_NAMES = [None, None, None, "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", None, None, None]
 
 STARTING_FEN = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1"
@@ -1152,7 +1155,39 @@ class Board(BaseBoard):
         if move in self.generate_legal_moves():
             self.push(move)
 
-    def wxf(self, move: Move):
+    def chinese_move(self, move: Move, full_width=False) -> str:
+        build = []
+        wxf_move = self.wxf(move)
+        piece_type = wxf_move[0]
+        if self.turn == RED:
+            piece_type = piece_type.upper()
+        build.append(PIECES_NAMES[piece_type])
+
+        if wxf_move[1] in "+-abced":
+            pos = POSITION_NAMES[wxf_move[1]]
+            build.insert(0, pos)
+        else:
+            if self.turn == RED:
+                build.append(CHINESE_NUMBERS[int(wxf_move[1])])
+            else:
+                build.append(wxf_move[1])
+
+        build.append(ACTION_NAMES[wxf_move[2]])
+
+        if self.turn == RED:
+            build.append(CHINESE_NUMBERS[int(wxf_move[3])])
+        else:
+            build.append(wxf_move[3])
+
+        if full_width:
+            chars = "１２３４５６７８９"
+            for i, c in enumerate(build):
+                if c in "123456789":
+                    build[i] = chars[int(c) - 1]
+
+        return "".join(build)
+
+    def wxf(self, move: Move) -> str:
         from_square = move.from_square
         to_square = move.to_square
         from_square_file = square_file(from_square)
@@ -1181,16 +1216,16 @@ class Board(BaseBoard):
                         file_pawns.append(p)
                     if len(file_pawns) > 1:
                         pawns += file_pawns
-               	if len(pawns) == 2:
+                if len(pawns) == 2:
                     result = PIECE_SYMBOLS[piece] + [plus_symbol, minus_symbol][pawns.index(from_square)]
                 elif len(pawns) == 3:
-                    result = PIECE_SYMBOLS[piece] + [plus_symbol,".", minus_symbol][pawns.index(from_square)]
+                    result = PIECE_SYMBOLS[piece] + [plus_symbol, ".", minus_symbol][pawns.index(from_square)]
                 else:
                     if self.turn == RED:
                         result = PIECE_SYMBOLS[piece] + chars[pawns.index(from_square)]
                     else:
                         result = PIECE_SYMBOLS[piece] + chars[pawns[::-1].index(from_square)]
-                    
+
         # 车马帅将炮
         else:
             other = self.pieces_mask(piece, self.turn) & BB_FILES[from_square_file] & ~BB_SQUARES[from_square]
@@ -1254,6 +1289,10 @@ class LegalMoveGenerator:
 
     def count(self) -> int:
         return len(list(self))
+
+    def chinese(self) -> str:
+        s = ", ".join(self.board.chinese_move(move) for move in self)
+        return s
 
     def __iter__(self) -> Iterator[Move]:
         return self.board.generate_legal_moves()
