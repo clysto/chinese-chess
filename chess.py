@@ -1075,7 +1075,7 @@ class Board(BaseBoard):
             cannon_checker = msb(checkers & self.cannons)
             rook_checker = msb(checkers & self.rooks)
             if line(cannon_checker, rook_checker) & BB_SQUARES[king] and not (between(cannon_checker, rook_checker) & BB_SQUARES[king]):
-                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, between(king, cannon_checker) & to_mask)
+                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, between(king, rook_checker) & to_mask)
 
     def generate_pseudo_legal_moves(self, from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD) -> Iterator[Move]:
         our_pieces = self.occupied_co[self.turn]
