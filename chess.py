@@ -1064,7 +1064,7 @@ class Board(BaseBoard):
                 target = between(king, checker) | checkers
                 yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, target & to_mask)
             elif checkers & self.cannons:
-                target = between(king, checker) | checkers
+                target = between(king, checker) & ~self.occupied | checkers
                 yield from self.generate_pseudo_legal_moves(~self.kings & from_mask & ~target, target & to_mask)
                 # 拆炮架
                 yield from self.generate_pseudo_legal_moves(~self.kings & from_mask & target, ~target & to_mask)
