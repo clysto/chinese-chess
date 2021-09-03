@@ -139,7 +139,7 @@ class Application(tk.Frame):
         self.reset()
 
     def reset(self) -> None:
-        self.board = chess.Board()
+        self.board = chess.Board(FEN)
         self.select_square = None
         self.update_canvas()
 
