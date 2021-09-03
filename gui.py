@@ -1,17 +1,49 @@
 #!/usr/bin/env python3
 
+import sys
+import threading
 import tkinter as tk
+from os.path import abspath
 from tkinter import messagebox
-from typing import Dict
+from typing import Callable, Dict
 
 from PIL import Image, ImageTk
 
 import chess
-from elephantfish import ThinkThread
-
 
 FEN = chess.STARTING_FEN
 SELF_PLAY, COMPUTER_PLAY = 1, 2
+THINK_TIME = 1
+
+sys.path.append(abspath('searcher'))
+
+from elephantfish import Searcher
+
+from searcher.tools import parseFEN, search
+
+
+class ThinkThread(threading.Thread):
+    def __init__(self, board: chess.Board, think_time: int, on_finish: Callable):
+        threading.Thread.__init__(self)
+        self.board = board
+        self.think_time = think_time
+        self.on_finish = on_finish
+
+    def run(self):
+        pos = parseFEN(self.board.fen())
+        move, _, _ = search(Searcher(), pos, THINK_TIME)
+        from_square, to_square = move
+        from_square = chess.SQUARES_180[from_square]
+        to_square = chess.SQUARES_180[to_square]
+        if self.board.turn == chess.BLACK:
+            from_square = 255 - from_square - 1
+            to_square = 255 - to_square - 1
+        move = chess.Move(from_square, to_square)
+        if self.on_finish:
+            self.on_finish(move)
+
+    def stop(self):
+        self.on_finish = None
 
 
 class PhotoImage(ImageTk.PhotoImage):

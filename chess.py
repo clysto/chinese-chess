@@ -1,7 +1,9 @@
 from __future__ import annotations
-from typing import Dict, Iterable, Iterator, List, Optional, Tuple, Generic, TypeVar
+
 import dataclasses
 import typing
+from typing import (Dict, Generic, Iterable, Iterator, List, Optional, Tuple,
+                    TypeVar)
 
 Color = bool
 COLORS = [RED, BLACK] = [True, False]
@@ -1129,7 +1131,7 @@ class Board(BaseBoard):
     def fen(self) -> str:
         return " ".join([
             self.board_fen(),
-            "w" if self.turn == RED else "b"
+            "w" if self.turn == RED else "b",
             "-",
             "-",
             str(0),
