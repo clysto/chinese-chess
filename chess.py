@@ -931,8 +931,6 @@ class Board(BaseBoard):
         return bool(self.checkers_mask())
 
     def is_checkmate(self) -> bool:
-        if not self.is_check():
-            return False
         return not any(self.generate_legal_moves())
 
     def _is_safe(self, king: Square, slider_blockers: List[Tuple[Bitboard, Bitboard]],
