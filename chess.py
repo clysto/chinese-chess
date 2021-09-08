@@ -103,7 +103,7 @@ BB_RED_SIDE = 0x0000_0000_0000_0000_0000_0000_0000_0000_ffff_ffff_ffff_ffff_ffff
 BB_BLACK_SIDE = 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_0000_0000_0000_0000_0000_0000_0000_0000
 
 
-def print_bitboard(bb: Bitboard, end="\n") -> None:
+def print_bitboard(bb: Bitboard) -> None:
     builder = []
 
     for square in SQUARES_180:
@@ -117,7 +117,7 @@ def print_bitboard(bb: Bitboard, end="\n") -> None:
         elif square != I0:
             builder.append(" ")
 
-    print("".join(builder), end=end)
+    print("".join(builder))
 
 
 BB_SQUARES = [
@@ -241,13 +241,8 @@ def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) 
     return attacks
 
 
-def _rook_attacks(square: Square, occupied: Bitboard):
-    return _sliding_attacks(square, occupied, [16, -16, -1, 1])
-
-
-def _cannon_attacks(square: Square, occupied: Bitboard) -> Bitboard:
+def _jump_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) -> Bitboard:
     attacks = BB_EMPTY
-    deltas = [16, -16, -1, 1]
     for delta in deltas:
         hops = 0
         sq = square
@@ -264,6 +259,40 @@ def _cannon_attacks(square: Square, occupied: Bitboard) -> Bitboard:
                     hops += 1
 
     return attacks
+
+
+def _edges(square: Square) -> Bitboard:
+    return (((BB_RANK_0 | BB_RANK_9) & ~BB_RANKS[square_rank(square)]) |
+            ((BB_FILE_A | BB_FILE_I) & ~BB_FILES[square_file(square)]))
+
+
+def _carry_rippler(mask: Bitboard) -> Iterator[Bitboard]:
+    # Carry-Rippler trick to iterate subsets of mask.
+    subset = BB_EMPTY
+    while True:
+        yield subset
+        subset = (subset - mask) & mask
+        if not subset:
+            break
+
+
+def _attack_table(deltas: List[int], jump=False) -> Tuple[List[Bitboard], List[Dict[Bitboard, Bitboard]]]:
+    mask_table = []
+    attack_table = []
+
+    for square in SQUARES:
+        attacks = {}
+
+        mask = _sliding_attacks(square, BB_EMPTY, deltas) & BB_IN_BOARD
+        if not jump:
+            mask &= ~_edges(square)
+        for subset in _carry_rippler(mask):
+            attacks[subset] = _jump_attacks(square, subset, deltas) if jump else _sliding_attacks(square, subset, deltas)
+
+        attack_table.append(attacks)
+        mask_table.append(mask)
+
+    return mask_table, attack_table
 
 
 def _step_attacks(square: Square, deltas: Iterable[int]) -> Bitboard:
@@ -388,6 +417,10 @@ def _knight_blocker(king: Square, knight: Square) -> Bitboard:
 BB_KNIGHT_MASKS, BB_KNIGHT_ATTACKS = _knight_attacks()
 BB_KNIGHT_REVERSED_MASKS, BB_KNIGHT_REVERSED_ATTACKS = _knight_attacks(reverse=True)
 BB_BISHOP_MASKS, BB_BISHOP_ATTACKS = _bishop_attacks()
+BB_CANNON_RANK_MASKS, BB_CANNON_RANK_ATTACKS = _attack_table([-1, 1], jump=True)
+BB_CANNON_FILE_MASKS, BB_CANNON_FILE_ATTACKS = _attack_table([-16, 16], jump=True)
+BB_RANK_MASKS, BB_RANK_ATTACKS = _attack_table([-1, 1])
+BB_FILE_MASKS, BB_FILE_ATTACKS = _attack_table([-16, 16])
 BB_PAWN_ATTACKS = _pawn_attacks()
 BB_PAWN_REVERSED_ATTACKS = _pawn_attacks(reverse=True)
 BB_KING_ATTACKS = _king_attacks()
@@ -747,7 +780,8 @@ class BaseBoard:
             return BB_PAWN_ATTACKS[color][square]
         if bb_square & self.kings:
             # 老将对脸杀
-            return BB_KING_ATTACKS[square] | (_rook_attacks(square, self.occupied) & self.kings)
+            return BB_KING_ATTACKS[square] | ((BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied] |
+                                               BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied]) & self.kings)
         if bb_square & self.advisors:
             return BB_ADVISOR_ATTACKS[square]
         elif bb_square & self.knights:
@@ -755,16 +789,21 @@ class BaseBoard:
         elif bb_square & self.bishops:
             return BB_BISHOP_ATTACKS[square][BB_BISHOP_MASKS[square] & self.occupied]
         elif bb_square & self.rooks:
-            return _rook_attacks(square, self.occupied)
+            return (BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied] |
+                    BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied])
         elif bb_square & self.cannons:
-            return (_cannon_attacks(square, self.occupied) |
-                    (_rook_attacks(square, self.occupied) & ~self.occupied))
+            return (BB_CANNON_FILE_ATTACKS[square][BB_CANNON_FILE_MASKS[square] & self.occupied] |
+                    BB_CANNON_RANK_ATTACKS[square][BB_CANNON_RANK_MASKS[square] & self.occupied] |
+                    ((BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied] |
+                      BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied]) & ~self.occupied))
         else:
             return BB_EMPTY
 
     def _attackers_mask(self, color: Color, square: Square, occupied: Bitboard) -> Bitboard:
-        cannon_attacks = _cannon_attacks(square, occupied)
-        rook_attacks = _rook_attacks(square, occupied)
+        cannon_attacks = (BB_CANNON_FILE_ATTACKS[square][BB_CANNON_FILE_MASKS[square] & occupied] |
+                          BB_CANNON_RANK_ATTACKS[square][BB_CANNON_RANK_MASKS[square] & occupied])
+        rook_attacks = (BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & occupied] |
+                        BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & occupied])
         attackers = (
             (cannon_attacks & self.cannons) |
             (rook_attacks & self.rooks) |
@@ -1004,7 +1043,7 @@ class Board(BaseBoard):
         return not self._is_safe(king, self._slider_blockers(king), self._knight_blockers(king), move)
 
     def _slider_blockers(self, king: Square) -> List[Tuple[Bitboard, Bitboard, int]]:
-        rays = _rook_attacks(king, BB_EMPTY)
+        rays = (BB_FILE_ATTACKS[king][BB_EMPTY] | BB_RANK_ATTACKS[king][BB_EMPTY])
         cannons = rays & self.cannons & self.occupied_co[not self.turn]
         rooks_and_kings = rays & (self.kings | self.rooks) & self.occupied_co[not self.turn]
 
