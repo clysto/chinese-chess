@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+__author__ = "毛亚琛"
+__email__ = "maoyachen55@gmail.com"
+
 import dataclasses
 import typing
 from typing import (Dict, Generic, Iterable, Iterator, List, Optional, Tuple,
@@ -100,12 +103,21 @@ BB_RED_SIDE = 0x0000_0000_0000_0000_0000_0000_0000_0000_ffff_ffff_ffff_ffff_ffff
 BB_BLACK_SIDE = 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_0000_0000_0000_0000_0000_0000_0000_0000
 
 
-def print_bitboard(bb: Bitboard) -> None:
-    bb = bb & (2**256 - 1)
-    s = format(bb, '0256b').replace("1", "@").replace("0", ".")
-    for i in range(3, 13):
-        print(f"{12-i} " + " ".join(s[i * 16 + 16 - 1 - 3:i * 16 - 1 + 4:-1]))
-    print("  a b c d e f g h i")
+def print_bitboard(bb: Bitboard, end="\n") -> None:
+    builder = []
+
+    for square in SQUARES_180:
+        mask = BB_SQUARES[square]
+        if not (mask & BB_IN_BOARD):
+            continue
+        builder.append("1" if bb & mask else ".")
+
+        if mask & BB_FILE_I:
+            builder.append("\n")
+        elif square != I0:
+            builder.append(" ")
+
+    print("".join(builder), end=end)
 
 
 BB_SQUARES = [

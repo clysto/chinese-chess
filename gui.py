@@ -3,6 +3,7 @@
 import sys
 import threading
 import tkinter as tk
+from os import getenv
 from os.path import abspath
 from tkinter import messagebox
 from typing import Callable, Dict
@@ -13,7 +14,7 @@ import chess
 
 FEN = chess.STARTING_FEN
 SELF_PLAY, COMPUTER_PLAY = 1, 2
-THINK_TIME = 1
+THINK_TIME = int(getenv("THINK_TIME")) if getenv("THINK_TIME") else 1
 
 sys.path.append(abspath('searcher'))
 
