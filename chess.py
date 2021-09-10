@@ -4,6 +4,8 @@ __author__ = "毛亚琛"
 __email__ = "maoyachen55@gmail.com"
 
 import dataclasses
+import pathlib
+import pickle
 import typing
 from typing import (Dict, Generic, Iterable, Iterator, List, Optional, Tuple,
                     TypeVar)
@@ -414,17 +416,56 @@ def _knight_blocker(king: Square, knight: Square) -> Bitboard:
     return BB_EMPTY
 
 
-BB_KNIGHT_MASKS, BB_KNIGHT_ATTACKS = _knight_attacks()
-BB_KNIGHT_REVERSED_MASKS, BB_KNIGHT_REVERSED_ATTACKS = _knight_attacks(reverse=True)
-BB_BISHOP_MASKS, BB_BISHOP_ATTACKS = _bishop_attacks()
-BB_CANNON_RANK_MASKS, BB_CANNON_RANK_ATTACKS = _attack_table([-1, 1], jump=True)
-BB_CANNON_FILE_MASKS, BB_CANNON_FILE_ATTACKS = _attack_table([-16, 16], jump=True)
-BB_RANK_MASKS, BB_RANK_ATTACKS = _attack_table([-1, 1])
-BB_FILE_MASKS, BB_FILE_ATTACKS = _attack_table([-16, 16])
-BB_PAWN_ATTACKS = _pawn_attacks()
-BB_PAWN_REVERSED_ATTACKS = _pawn_attacks(reverse=True)
-BB_KING_ATTACKS = _king_attacks()
-BB_ADVISOR_ATTACKS = _advisor_attacks()
+# 着法预制表
+_moves_table_path = pathlib.Path("moves_table")
+_load_success = False
+
+if _moves_table_path.is_file():
+    with _moves_table_path.open("rb") as f:
+        try:
+            (
+                BB_KNIGHT_MASKS, BB_KNIGHT_ATTACKS,
+                BB_KNIGHT_REVERSED_MASKS, BB_KNIGHT_REVERSED_ATTACKS,
+                BB_BISHOP_MASKS, BB_BISHOP_ATTACKS,
+                BB_CANNON_RANK_MASKS, BB_CANNON_RANK_ATTACKS,
+                BB_CANNON_FILE_MASKS, BB_CANNON_FILE_ATTACKS,
+                BB_RANK_MASKS, BB_RANK_ATTACKS,
+                BB_FILE_MASKS, BB_FILE_ATTACKS,
+                BB_PAWN_ATTACKS,
+                BB_PAWN_REVERSED_ATTACKS,
+                BB_KING_ATTACKS,
+                BB_ADVISOR_ATTACKS,
+            ) = pickle.load(f)
+            _load_success = True
+        except:
+            _load_success = False
+
+if not _load_success:
+    BB_KNIGHT_MASKS, BB_KNIGHT_ATTACKS = _knight_attacks()
+    BB_KNIGHT_REVERSED_MASKS, BB_KNIGHT_REVERSED_ATTACKS = _knight_attacks(reverse=True)
+    BB_BISHOP_MASKS, BB_BISHOP_ATTACKS = _bishop_attacks()
+    BB_CANNON_RANK_MASKS, BB_CANNON_RANK_ATTACKS = _attack_table([-1, 1], jump=True)
+    BB_CANNON_FILE_MASKS, BB_CANNON_FILE_ATTACKS = _attack_table([-16, 16], jump=True)
+    BB_RANK_MASKS, BB_RANK_ATTACKS = _attack_table([-1, 1])
+    BB_FILE_MASKS, BB_FILE_ATTACKS = _attack_table([-16, 16])
+    BB_PAWN_ATTACKS = _pawn_attacks()
+    BB_PAWN_REVERSED_ATTACKS = _pawn_attacks(reverse=True)
+    BB_KING_ATTACKS = _king_attacks()
+    BB_ADVISOR_ATTACKS = _advisor_attacks()
+    with _moves_table_path.open("wb") as f:
+        pickle.dump((
+            BB_KNIGHT_MASKS, BB_KNIGHT_ATTACKS,
+            BB_KNIGHT_REVERSED_MASKS, BB_KNIGHT_REVERSED_ATTACKS,
+            BB_BISHOP_MASKS, BB_BISHOP_ATTACKS,
+            BB_CANNON_RANK_MASKS, BB_CANNON_RANK_ATTACKS,
+            BB_CANNON_FILE_MASKS, BB_CANNON_FILE_ATTACKS,
+            BB_RANK_MASKS, BB_RANK_ATTACKS,
+            BB_FILE_MASKS, BB_FILE_ATTACKS,
+            BB_PAWN_ATTACKS,
+            BB_PAWN_REVERSED_ATTACKS,
+            BB_KING_ATTACKS,
+            BB_ADVISOR_ATTACKS,
+        ), f)
 
 
 @dataclasses.dataclass
@@ -1109,12 +1150,13 @@ class Board(BaseBoard):
         if count_ones(checkers) == 1:
             # 只有一个子将
             checker = msb(checkers)
-            if checkers & (self.rooks | self.kings):
+            if checkers & (self.rooks | self.kings | self.pawns):
                 target = between(king, checker) | checkers
                 yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, target & to_mask)
             elif checkers & self.cannons:
-                target = between(king, checker) & ~self.occupied | checkers
-                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask & ~target, target & to_mask)
+                target = between(king, checker) | checkers
+                # 垫子但不能吃子
+                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask & ~target, target & to_mask & ~self.occupied)
                 # 拆炮架
                 yield from self.generate_pseudo_legal_moves(~self.kings & from_mask & target, ~target & to_mask)
             elif checkers & self.knights:
