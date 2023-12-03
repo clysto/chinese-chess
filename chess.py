@@ -8,8 +8,7 @@ import gzip
 import pathlib
 import pickle
 import typing
-from typing import (Dict, Generic, Iterable, Iterator, List, Optional, Tuple,
-                    TypeVar)
+from typing import Dict, Generic, Iterable, Iterator, List, Optional, Tuple, TypeVar
 
 Color = bool
 COLORS = [RED, BLACK] = [True, False]
@@ -20,56 +19,345 @@ PieceType = int
 PIECE_TYPES = [PAWN, CANNON, ROOK, KNIGHT, BISHOP, ADVISOR, KING] = range(1, 8)
 PIECE_SYMBOLS = [None, "p", "c", "r", "n", "b", "a", "k"]
 PIECES_NAMES = {
-    "R": "车", "r": "俥",
-    "N": "马", "n": "傌",
-    "B": "相", "b": "象",
-    "A": "仕", "a": "士",
-    "K": "帅", "k": "将",
-    "P": "兵", "p": "卒",
-    "C": "炮", "c": "砲",
+    "R": "车",
+    "r": "俥",
+    "N": "马",
+    "n": "傌",
+    "B": "相",
+    "b": "象",
+    "A": "仕",
+    "a": "士",
+    "K": "帅",
+    "k": "将",
+    "P": "兵",
+    "p": "卒",
+    "C": "炮",
+    "c": "砲",
 }
 
 ACTION_NAMES = {".": "平", "+": "进", "-": "退"}
-POSITION_NAMES = {".": "中", "+": "前", "-": "后", "a": "一", "b": "二", "c": "三", "d": "四", "e": "五"}
+POSITION_NAMES = {
+    ".": "中",
+    "+": "前",
+    "-": "后",
+    "a": "一",
+    "b": "二",
+    "c": "三",
+    "d": "四",
+    "e": "五",
+}
 
 
 def piece_symbol(piece_type: PieceType) -> str:
     return typing.cast(str, PIECE_SYMBOLS[piece_type])
 
 
-FILE_NAMES = [None, None, None, "a", "b", "c", "d", "e", "f", "g", "h", "i", None, None, None, None]
+FILE_NAMES = [
+    None,
+    None,
+    None,
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    None,
+    None,
+    None,
+    None,
+]
 CHINESE_NUMBERS = [None, "一", "二", "三", "四", "五", "六", "七", "八", "九"]
-RANK_NAMES = [None, None, None, "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", None, None, None]
+RANK_NAMES = [
+    None,
+    None,
+    None,
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    None,
+    None,
+    None,
+]
 
 STARTING_FEN = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1"
 STARTING_BOARD_FEN = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR"
 
 Square = int
 SQUARES = [
-    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __,
-    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __,
-    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __,
-    __, __, __, A0, B0, C0, D0, E0, F0, G0, H0, I0, __, __, __, __,
-    __, __, __, A1, B1, C1, D1, E1, F1, G1, H1, I1, __, __, __, __,
-    __, __, __, A2, B2, C2, D2, E2, F2, G2, H2, I2, __, __, __, __,
-    __, __, __, A3, B3, C3, D3, E3, F3, G3, H3, I3, __, __, __, __,
-    __, __, __, A4, B4, C4, D4, E4, F4, G4, H4, I4, __, __, __, __,
-    __, __, __, A5, B5, C5, D5, E5, F5, G5, H5, I5, __, __, __, __,
-    __, __, __, A6, B6, C6, D6, E6, F6, G6, H6, I6, __, __, __, __,
-    __, __, __, A7, B7, C7, D7, E7, F7, G7, H7, I7, __, __, __, __,
-    __, __, __, A8, B8, C8, D8, E8, F8, G8, H8, I8, __, __, __, __,
-    __, __, __, A9, B9, C9, D9, E9, F9, G9, H9, I9, __, __, __, __,
-    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __,
-    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __,
-    __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    A0,
+    B0,
+    C0,
+    D0,
+    E0,
+    F0,
+    G0,
+    H0,
+    I0,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    A1,
+    B1,
+    C1,
+    D1,
+    E1,
+    F1,
+    G1,
+    H1,
+    I1,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    A2,
+    B2,
+    C2,
+    D2,
+    E2,
+    F2,
+    G2,
+    H2,
+    I2,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    A3,
+    B3,
+    C3,
+    D3,
+    E3,
+    F3,
+    G3,
+    H3,
+    I3,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    A4,
+    B4,
+    C4,
+    D4,
+    E4,
+    F4,
+    G4,
+    H4,
+    I4,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    A5,
+    B5,
+    C5,
+    D5,
+    E5,
+    F5,
+    G5,
+    H5,
+    I5,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    A6,
+    B6,
+    C6,
+    D6,
+    E6,
+    F6,
+    G6,
+    H6,
+    I6,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    A7,
+    B7,
+    C7,
+    D7,
+    E7,
+    F7,
+    G7,
+    H7,
+    I7,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    A8,
+    B8,
+    C8,
+    D8,
+    E8,
+    F8,
+    G8,
+    H8,
+    I8,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    A9,
+    B9,
+    C9,
+    D9,
+    E9,
+    F9,
+    G9,
+    H9,
+    I9,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
+    __,
 ] = range(256)
 
-SQUARE_NAMES = [
-    f + r if f and r else None for r in RANK_NAMES for f in FILE_NAMES]
+SQUARE_NAMES = [f + r if f and r else None for r in RANK_NAMES for f in FILE_NAMES]
 
 
 def square_file(square: Square) -> int:
-    return square & 0xf
+    return square & 0xF
 
 
 def square_file_wxf(square: Square, color: Color) -> int:
@@ -88,11 +376,13 @@ def square_in_board(square: Square) -> bool:
 
 
 def square_distance(a: Square, b: Square) -> int:
-    return max(abs(square_file(a) - square_file(b)), abs(square_rank(a) - square_rank(b)))
+    return max(
+        abs(square_file(a) - square_file(b)), abs(square_rank(a) - square_rank(b))
+    )
 
 
 def square_mirror(square: Square) -> Square:
-    return square ^ 0xf0
+    return square ^ 0xF0
 
 
 SQUARES_180 = [square_mirror(sq) for sq in SQUARES]
@@ -100,10 +390,18 @@ SQUARES_180 = [square_mirror(sq) for sq in SQUARES]
 
 Bitboard = int
 BB_EMPTY = 0
-BB_ALL = 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff
-BB_IN_BOARD = 0x0000_0000_0000_0ff8_0ff8_0ff8_0ff8_0ff8_0ff8_0ff8_0ff8_0ff8_0ff8_0000_0000_0000
-BB_RED_SIDE = 0x0000_0000_0000_0000_0000_0000_0000_0000_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff
-BB_BLACK_SIDE = 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_0000_0000_0000_0000_0000_0000_0000_0000
+BB_ALL = (
+    0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF
+)
+BB_IN_BOARD = (
+    0x0000_0000_0000_0FF8_0FF8_0FF8_0FF8_0FF8_0FF8_0FF8_0FF8_0FF8_0FF8_0000_0000_0000
+)
+BB_RED_SIDE = (
+    0x0000_0000_0000_0000_0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF
+)
+BB_BLACK_SIDE = (
+    0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_0000_0000_0000_0000_0000_0000_0000_0000
+)
 
 
 def print_bitboard(bb: Bitboard) -> None:
@@ -124,35 +422,295 @@ def print_bitboard(bb: Bitboard) -> None:
 
 
 BB_SQUARES = [
-    _, _, _, _____, _____, _____, _____, _____, _____, _____, _____, _____, _, _, _, _,
-    _, _, _, _____, _____, _____, _____, _____, _____, _____, _____, _____, _, _, _, _,
-    _, _, _, _____, _____, _____, _____, _____, _____, _____, _____, _____, _, _, _, _,
-    _, _, _, BB_A0, BB_B0, BB_C0, BB_D0, BB_E0, BB_F0, BB_G0, BB_H0, BB_I0, _, _, _, _,
-    _, _, _, BB_A1, BB_B1, BB_C1, BB_D1, BB_E1, BB_F1, BB_G1, BB_H1, BB_I1, _, _, _, _,
-    _, _, _, BB_A2, BB_B2, BB_C2, BB_D2, BB_E2, BB_F2, BB_G2, BB_H2, BB_I2, _, _, _, _,
-    _, _, _, BB_A3, BB_B3, BB_C3, BB_D3, BB_E3, BB_F3, BB_G3, BB_H3, BB_I3, _, _, _, _,
-    _, _, _, BB_A4, BB_B4, BB_C4, BB_D4, BB_E4, BB_F4, BB_G4, BB_H4, BB_I4, _, _, _, _,
-    _, _, _, BB_A5, BB_B5, BB_C5, BB_D5, BB_E5, BB_F5, BB_G5, BB_H5, BB_I5, _, _, _, _,
-    _, _, _, BB_A6, BB_B6, BB_C6, BB_D6, BB_E6, BB_F6, BB_G6, BB_H6, BB_I6, _, _, _, _,
-    _, _, _, BB_A7, BB_B7, BB_C7, BB_D7, BB_E7, BB_F7, BB_G7, BB_H7, BB_I7, _, _, _, _,
-    _, _, _, BB_A8, BB_B8, BB_C8, BB_D8, BB_E8, BB_F8, BB_G8, BB_H8, BB_I8, _, _, _, _,
-    _, _, _, BB_A9, BB_B9, BB_C9, BB_D9, BB_E9, BB_F9, BB_G9, BB_H9, BB_I9, _, _, _, _,
-    _, _, _, _____, _____, _____, _____, _____, _____, _____, _____, _____, _, _, _, _,
-    _, _, _, _____, _____, _____, _____, _____, _____, _____, _____, _____, _, _, _, _,
-    _, _, _, _____, _____, _____, _____, _____, _____, _____, _____, _____, _, _, _, _,
+    _,
+    _,
+    _,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    BB_A0,
+    BB_B0,
+    BB_C0,
+    BB_D0,
+    BB_E0,
+    BB_F0,
+    BB_G0,
+    BB_H0,
+    BB_I0,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    BB_A1,
+    BB_B1,
+    BB_C1,
+    BB_D1,
+    BB_E1,
+    BB_F1,
+    BB_G1,
+    BB_H1,
+    BB_I1,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    BB_A2,
+    BB_B2,
+    BB_C2,
+    BB_D2,
+    BB_E2,
+    BB_F2,
+    BB_G2,
+    BB_H2,
+    BB_I2,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    BB_A3,
+    BB_B3,
+    BB_C3,
+    BB_D3,
+    BB_E3,
+    BB_F3,
+    BB_G3,
+    BB_H3,
+    BB_I3,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    BB_A4,
+    BB_B4,
+    BB_C4,
+    BB_D4,
+    BB_E4,
+    BB_F4,
+    BB_G4,
+    BB_H4,
+    BB_I4,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    BB_A5,
+    BB_B5,
+    BB_C5,
+    BB_D5,
+    BB_E5,
+    BB_F5,
+    BB_G5,
+    BB_H5,
+    BB_I5,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    BB_A6,
+    BB_B6,
+    BB_C6,
+    BB_D6,
+    BB_E6,
+    BB_F6,
+    BB_G6,
+    BB_H6,
+    BB_I6,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    BB_A7,
+    BB_B7,
+    BB_C7,
+    BB_D7,
+    BB_E7,
+    BB_F7,
+    BB_G7,
+    BB_H7,
+    BB_I7,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    BB_A8,
+    BB_B8,
+    BB_C8,
+    BB_D8,
+    BB_E8,
+    BB_F8,
+    BB_G8,
+    BB_H8,
+    BB_I8,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    BB_A9,
+    BB_B9,
+    BB_C9,
+    BB_D9,
+    BB_E9,
+    BB_F9,
+    BB_G9,
+    BB_H9,
+    BB_I9,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _____,
+    _,
+    _,
+    _,
+    _,
 ] = [1 << sq for sq in SQUARES]
 
 BB_CORNERS = BB_A0 | BB_I0 | BB_A9 | BB_I9
 BB_RED_PAWNS = BB_A3 | BB_C3 | BB_E3 | BB_G3 | BB_I3
 BB_BLACK_PAWNS = BB_A6 | BB_C6 | BB_E6 | BB_G6 | BB_I6
 
-BB_IN_PALACE = (BB_D0 | BB_E0 | BB_F0 | BB_D1 | BB_E1 | BB_F1 | BB_D2 | BB_E2 | BB_F2 |
-                BB_D7 | BB_E7 | BB_F7 | BB_D8 | BB_E8 | BB_F8 | BB_D9 | BB_E9 | BB_F9)
+BB_IN_PALACE = (
+    BB_D0
+    | BB_E0
+    | BB_F0
+    | BB_D1
+    | BB_E1
+    | BB_F1
+    | BB_D2
+    | BB_E2
+    | BB_F2
+    | BB_D7
+    | BB_E7
+    | BB_F7
+    | BB_D8
+    | BB_E8
+    | BB_F8
+    | BB_D9
+    | BB_E9
+    | BB_F9
+)
 
 SQUARES_IN_BOARD = [sq for sq in SQUARES if BB_SQUARES[sq] & BB_IN_BOARD]
 
 BB_FILES = [
-    _, _, _,
+    _,
+    _,
+    _,
     BB_FILE_A,
     BB_FILE_B,
     BB_FILE_C,
@@ -162,11 +720,20 @@ BB_FILES = [
     BB_FILE_G,
     BB_FILE_H,
     BB_FILE_I,
-    _, _, _, _,
-] = [0x0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001 << i for i in range(16)]
+    _,
+    _,
+    _,
+    _,
+] = [
+    0x0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001_0001
+    << i
+    for i in range(16)
+]
 
 BB_RANKS = [
-    _, _, _,
+    _,
+    _,
+    _,
     BB_RANK_0,
     BB_RANK_1,
     BB_RANK_2,
@@ -177,11 +744,30 @@ BB_RANKS = [
     BB_RANK_7,
     BB_RANK_8,
     BB_RANK_9,
-    _, _, _,
-] = [0xffff << (16 * i) for i in range(16)]
+    _,
+    _,
+    _,
+] = [0xFFFF << (16 * i) for i in range(16)]
 
-BB_SQUARES_BISHOP = BB_C0 | BB_G0 | BB_A2 | BB_E2 | BB_I2 | BB_C4 | BB_G4 | BB_C5 | BB_G5 | BB_A7 | BB_E7 | BB_I7 | BB_C9 | BB_G9
-BB_SQUARES_ADVISOR = BB_D0 | BB_F0 | BB_E1 | BB_D2 | BB_F2 | BB_D7 | BB_F7 | BB_E8 | BB_D9 | BB_F9
+BB_SQUARES_BISHOP = (
+    BB_C0
+    | BB_G0
+    | BB_A2
+    | BB_E2
+    | BB_I2
+    | BB_C4
+    | BB_G4
+    | BB_C5
+    | BB_G5
+    | BB_A7
+    | BB_E7
+    | BB_I7
+    | BB_C9
+    | BB_G9
+)
+BB_SQUARES_ADVISOR = (
+    BB_D0 | BB_F0 | BB_E1 | BB_D2 | BB_F2 | BB_D7 | BB_F7 | BB_E8 | BB_D9 | BB_F9
+)
 
 
 def msb(bb: Bitboard) -> int:
@@ -197,7 +783,7 @@ def scan_reversed(bb: Bitboard) -> Iterator[Square]:
 
 def count_ones(bb: Bitboard):
     s = 0
-    t = {'0': 0, '1': 1, '2': 1, '3': 2, '4': 1, '5': 2, '6': 2, '7': 3}
+    t = {"0": 0, "1": 1, "2": 1, "3": 2, "4": 1, "5": 2, "6": 2, "7": 3}
     for c in oct(bb)[2:]:
         s += t[c]
     return s
@@ -226,7 +812,9 @@ def line(a: Square, b: Square) -> Bitboard:
         return BB_EMPTY
 
 
-def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) -> Bitboard:
+def _sliding_attacks(
+    square: Square, occupied: Bitboard, deltas: Iterable[int]
+) -> Bitboard:
     attacks = BB_EMPTY
 
     for delta in deltas:
@@ -244,7 +832,9 @@ def _sliding_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) 
     return attacks
 
 
-def _jump_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) -> Bitboard:
+def _jump_attacks(
+    square: Square, occupied: Bitboard, deltas: Iterable[int]
+) -> Bitboard:
     attacks = BB_EMPTY
     for delta in deltas:
         hops = 0
@@ -265,8 +855,9 @@ def _jump_attacks(square: Square, occupied: Bitboard, deltas: Iterable[int]) -> 
 
 
 def _edges(square: Square) -> Bitboard:
-    return (((BB_RANK_0 | BB_RANK_9) & ~BB_RANKS[square_rank(square)]) |
-            ((BB_FILE_A | BB_FILE_I) & ~BB_FILES[square_file(square)]))
+    return ((BB_RANK_0 | BB_RANK_9) & ~BB_RANKS[square_rank(square)]) | (
+        (BB_FILE_A | BB_FILE_I) & ~BB_FILES[square_file(square)]
+    )
 
 
 def _carry_rippler(mask: Bitboard) -> Iterator[Bitboard]:
@@ -279,7 +870,9 @@ def _carry_rippler(mask: Bitboard) -> Iterator[Bitboard]:
             break
 
 
-def _attack_table(deltas: List[int], jump=False) -> Tuple[List[Bitboard], List[Dict[Bitboard, Bitboard]]]:
+def _attack_table(
+    deltas: List[int], jump=False
+) -> Tuple[List[Bitboard], List[Dict[Bitboard, Bitboard]]]:
     mask_table = []
     attack_table = []
 
@@ -290,7 +883,11 @@ def _attack_table(deltas: List[int], jump=False) -> Tuple[List[Bitboard], List[D
         if not jump:
             mask &= ~_edges(square)
         for subset in _carry_rippler(mask):
-            attacks[subset] = _jump_attacks(square, subset, deltas) if jump else _sliding_attacks(square, subset, deltas)
+            attacks[subset] = (
+                _jump_attacks(square, subset, deltas)
+                if jump
+                else _sliding_attacks(square, subset, deltas)
+            )
 
         attack_table.append(attacks)
         mask_table.append(mask)
@@ -322,10 +919,16 @@ def _pawn_attacks(reverse=False) -> List[List[Bitboard]]:
     return attacks
 
 
-def _knight_attacks(reverse=False) -> Tuple[List[Bitboard], List[Dict[Bitboard, Bitboard]]]:
+def _knight_attacks(
+    reverse=False,
+) -> Tuple[List[Bitboard], List[Dict[Bitboard, Bitboard]]]:
     mask_table = []
     attack_table = []
-    knight_deltas = [33, 31, -14, 18, -33, -31, -18, 14] if not reverse else [14, 31, 33, 18, -14, -31, -18, -33]
+    knight_deltas = (
+        [33, 31, -14, 18, -33, -31, -18, 14]
+        if not reverse
+        else [14, 31, 33, 18, -14, -31, -18, -33]
+    )
     directions = [16, 1, -16, -1] if not reverse else [15, 17, -15, -17]
     for square in SQUARES:
         if not square_in_board(square):
@@ -337,7 +940,7 @@ def _knight_attacks(reverse=False) -> Tuple[List[Bitboard], List[Dict[Bitboard, 
         for d in directions:
             mask |= BB_SQUARES[square + d]
 
-        for i in range(0xf):
+        for i in range(0xF):
             # 马脚位置
             subset = BB_EMPTY
             deltas = []
@@ -369,7 +972,7 @@ def _bishop_attacks() -> List[Bitboard]:
         mask = BB_EMPTY
         for d in directions:
             mask |= BB_SQUARES[square + d]
-        for i in range(0xf):
+        for i in range(0xF):
             # 象眼位置
             subset = BB_EMPTY
             deltas = []
@@ -388,7 +991,7 @@ def _bishop_attacks() -> List[Bitboard]:
 def _king_attacks() -> List[Bitboard]:
     attacks = []
     for square in SQUARES:
-        if not(BB_SQUARES[square] & BB_IN_PALACE):
+        if not (BB_SQUARES[square] & BB_IN_PALACE):
             attacks.append(BB_EMPTY)
             continue
         attacks.append(_step_attacks(square, [-16, 16, 1, -1]) & BB_IN_PALACE)
@@ -398,7 +1001,7 @@ def _king_attacks() -> List[Bitboard]:
 def _advisor_attacks() -> List[Bitboard]:
     attacks = []
     for square in SQUARES:
-        if not(BB_SQUARES[square] & BB_SQUARES_ADVISOR):
+        if not (BB_SQUARES[square] & BB_SQUARES_ADVISOR):
             attacks.append(BB_EMPTY)
             continue
         attacks.append(_step_attacks(square, [15, 17, -15, -17]) & BB_IN_PALACE)
@@ -406,11 +1009,12 @@ def _advisor_attacks() -> List[Bitboard]:
 
 
 def _knight_blocker(king: Square, knight: Square) -> Bitboard:
-    masks = [BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 15],
-             BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 17],
-             BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 15],
-             BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 17],
-             ]
+    masks = [
+        BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 15],
+        BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 17],
+        BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 15],
+        BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 17],
+    ]
     for mask in masks:
         if BB_KNIGHT_REVERSED_ATTACKS[king][mask] & BB_SQUARES[knight]:
             return BB_KNIGHT_REVERSED_MASKS[king] & ~mask
@@ -436,13 +1040,20 @@ def _dump_moves_table(table):
 
 try:
     (
-        BB_KNIGHT_MASKS, BB_KNIGHT_ATTACKS,
-        BB_KNIGHT_REVERSED_MASKS, BB_KNIGHT_REVERSED_ATTACKS,
-        BB_BISHOP_MASKS, BB_BISHOP_ATTACKS,
-        BB_CANNON_RANK_MASKS, BB_CANNON_RANK_ATTACKS,
-        BB_CANNON_FILE_MASKS, BB_CANNON_FILE_ATTACKS,
-        BB_RANK_MASKS, BB_RANK_ATTACKS,
-        BB_FILE_MASKS, BB_FILE_ATTACKS,
+        BB_KNIGHT_MASKS,
+        BB_KNIGHT_ATTACKS,
+        BB_KNIGHT_REVERSED_MASKS,
+        BB_KNIGHT_REVERSED_ATTACKS,
+        BB_BISHOP_MASKS,
+        BB_BISHOP_ATTACKS,
+        BB_CANNON_RANK_MASKS,
+        BB_CANNON_RANK_ATTACKS,
+        BB_CANNON_FILE_MASKS,
+        BB_CANNON_FILE_ATTACKS,
+        BB_RANK_MASKS,
+        BB_RANK_ATTACKS,
+        BB_FILE_MASKS,
+        BB_FILE_ATTACKS,
         BB_PAWN_ATTACKS,
         BB_PAWN_REVERSED_ATTACKS,
         BB_KING_ATTACKS,
@@ -461,24 +1072,32 @@ except:
     BB_PAWN_REVERSED_ATTACKS = _pawn_attacks(reverse=True)
     BB_KING_ATTACKS = _king_attacks()
     BB_ADVISOR_ATTACKS = _advisor_attacks()
-    _dump_moves_table((
-        BB_KNIGHT_MASKS, BB_KNIGHT_ATTACKS,
-        BB_KNIGHT_REVERSED_MASKS, BB_KNIGHT_REVERSED_ATTACKS,
-        BB_BISHOP_MASKS, BB_BISHOP_ATTACKS,
-        BB_CANNON_RANK_MASKS, BB_CANNON_RANK_ATTACKS,
-        BB_CANNON_FILE_MASKS, BB_CANNON_FILE_ATTACKS,
-        BB_RANK_MASKS, BB_RANK_ATTACKS,
-        BB_FILE_MASKS, BB_FILE_ATTACKS,
-        BB_PAWN_ATTACKS,
-        BB_PAWN_REVERSED_ATTACKS,
-        BB_KING_ATTACKS,
-        BB_ADVISOR_ATTACKS,
-    ))
+    _dump_moves_table(
+        (
+            BB_KNIGHT_MASKS,
+            BB_KNIGHT_ATTACKS,
+            BB_KNIGHT_REVERSED_MASKS,
+            BB_KNIGHT_REVERSED_ATTACKS,
+            BB_BISHOP_MASKS,
+            BB_BISHOP_ATTACKS,
+            BB_CANNON_RANK_MASKS,
+            BB_CANNON_RANK_ATTACKS,
+            BB_CANNON_FILE_MASKS,
+            BB_CANNON_FILE_ATTACKS,
+            BB_RANK_MASKS,
+            BB_RANK_ATTACKS,
+            BB_FILE_MASKS,
+            BB_FILE_ATTACKS,
+            BB_PAWN_ATTACKS,
+            BB_PAWN_REVERSED_ATTACKS,
+            BB_KING_ATTACKS,
+            BB_ADVISOR_ATTACKS,
+        )
+    )
 
 
 @dataclasses.dataclass
 class Piece:
-
     piece_type: PieceType
 
     color: Color
@@ -508,7 +1127,6 @@ class Piece:
 
 @dataclasses.dataclass(unsafe_hash=True)
 class Move:
-
     from_square: Square
 
     to_square: Square
@@ -548,7 +1166,6 @@ BoardT = TypeVar("BoardT", bound="Board")
 
 
 class _BoardState(Generic[BoardT]):
-
     def __init__(self, board: BoardT) -> None:
         self.pawns = board.pawns
         self.knights = board.knights
@@ -583,7 +1200,6 @@ class _BoardState(Generic[BoardT]):
 
 
 class BaseBoard:
-
     def __init__(self, board_fen: Optional[str] = STARTING_BOARD_FEN) -> None:
         self.occupied_co = [BB_EMPTY, BB_EMPTY]
         if board_fen is None:
@@ -628,7 +1244,9 @@ class BaseBoard:
     def _set_board_fen(self, fen: str) -> None:
         fen = fen.strip()
         if " " in fen:
-            raise ValueError(f"expected position part of fen, got multiple parts: {fen!r}")
+            raise ValueError(
+                f"expected position part of fen, got multiple parts: {fen!r}"
+            )
 
         rows = fen.split("/")
         if len(rows) != 10:
@@ -641,17 +1259,23 @@ class BaseBoard:
             for c in row:
                 if c in ["1", "2", "3", "4", "5", "6", "7", "8", "9"]:
                     if previous_was_digit:
-                        raise ValueError(f"two subsequent digits in position part of fen: {fen!r}")
+                        raise ValueError(
+                            f"two subsequent digits in position part of fen: {fen!r}"
+                        )
                     field_sum += int(c)
                     previous_was_digit = True
                 elif c.lower() in PIECE_SYMBOLS:
                     field_sum += 1
                     previous_was_digit = False
                 else:
-                    raise ValueError(f"invalid character in position part of fen: {fen!r}")
+                    raise ValueError(
+                        f"invalid character in position part of fen: {fen!r}"
+                    )
 
             if field_sum != 9:
-                raise ValueError(f"expected 9 columns per row in position part of fen: {fen!r}")
+                raise ValueError(
+                    f"expected 9 columns per row in position part of fen: {fen!r}"
+                )
 
         self._clear_board()
         square_index = A0
@@ -660,7 +1284,9 @@ class BaseBoard:
                 square_index += int(c)
             elif c.lower() in PIECE_SYMBOLS:
                 piece = Piece.from_symbol(c)
-                self._set_piece_at(SQUARES_180[square_index], piece.piece_type, piece.color)
+                self._set_piece_at(
+                    SQUARES_180[square_index], piece.piece_type, piece.color
+                )
                 square_index += 1
             else:
                 square_index += 7
@@ -728,7 +1354,9 @@ class BaseBoard:
         piece_type = self._remove_piece_at(square)
         return Piece(piece_type, color) if piece_type else None
 
-    def _set_piece_at(self, square: Square, piece_type: PieceType, color: Color) -> None:
+    def _set_piece_at(
+        self, square: Square, piece_type: PieceType, color: Color
+    ) -> None:
         self._remove_piece_at(square)
 
         mask = BB_SQUARES[square]
@@ -829,8 +1457,13 @@ class BaseBoard:
             return BB_PAWN_ATTACKS[color][square]
         if bb_square & self.kings:
             # 老将对脸杀
-            return BB_KING_ATTACKS[square] | ((BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied] |
-                                               BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied]) & self.kings)
+            return BB_KING_ATTACKS[square] | (
+                (
+                    BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied]
+                    | BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied]
+                )
+                & self.kings
+            )
         if bb_square & self.advisors:
             return BB_ADVISOR_ATTACKS[square]
         elif bb_square & self.knights:
@@ -838,29 +1471,56 @@ class BaseBoard:
         elif bb_square & self.bishops:
             return BB_BISHOP_ATTACKS[square][BB_BISHOP_MASKS[square] & self.occupied]
         elif bb_square & self.rooks:
-            return (BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied] |
-                    BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied])
+            return (
+                BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied]
+                | BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied]
+            )
         elif bb_square & self.cannons:
-            return (BB_CANNON_FILE_ATTACKS[square][BB_CANNON_FILE_MASKS[square] & self.occupied] |
-                    BB_CANNON_RANK_ATTACKS[square][BB_CANNON_RANK_MASKS[square] & self.occupied] |
-                    ((BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied] |
-                      BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied]) & ~self.occupied))
+            return (
+                BB_CANNON_FILE_ATTACKS[square][
+                    BB_CANNON_FILE_MASKS[square] & self.occupied
+                ]
+                | BB_CANNON_RANK_ATTACKS[square][
+                    BB_CANNON_RANK_MASKS[square] & self.occupied
+                ]
+                | (
+                    (
+                        BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & self.occupied]
+                        | BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & self.occupied]
+                    )
+                    & ~self.occupied
+                )
+            )
         else:
             return BB_EMPTY
 
-    def _attackers_mask(self, color: Color, square: Square, occupied: Bitboard) -> Bitboard:
-        cannon_attacks = (BB_CANNON_FILE_ATTACKS[square][BB_CANNON_FILE_MASKS[square] & occupied] |
-                          BB_CANNON_RANK_ATTACKS[square][BB_CANNON_RANK_MASKS[square] & occupied])
-        rook_attacks = (BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & occupied] |
-                        BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & occupied])
+    def _attackers_mask(
+        self, color: Color, square: Square, occupied: Bitboard
+    ) -> Bitboard:
+        cannon_attacks = (
+            BB_CANNON_FILE_ATTACKS[square][BB_CANNON_FILE_MASKS[square] & occupied]
+            | BB_CANNON_RANK_ATTACKS[square][BB_CANNON_RANK_MASKS[square] & occupied]
+        )
+        rook_attacks = (
+            BB_FILE_ATTACKS[square][BB_FILE_MASKS[square] & occupied]
+            | BB_RANK_ATTACKS[square][BB_RANK_MASKS[square] & occupied]
+        )
         attackers = (
-            (cannon_attacks & self.cannons) |
-            (rook_attacks & self.rooks) |
-            (BB_KNIGHT_REVERSED_ATTACKS[square][occupied & BB_KNIGHT_REVERSED_MASKS[square]] & self.knights) |
-            (BB_BISHOP_ATTACKS[square][occupied & BB_BISHOP_MASKS[square]] & self.bishops) |
-            (BB_PAWN_REVERSED_ATTACKS[color][square] & self.pawns) |
-            (BB_ADVISOR_ATTACKS[square] & self.advisors) |
-            ((BB_KING_ATTACKS[square] | (rook_attacks & self.kings)) & self.kings)
+            (cannon_attacks & self.cannons)
+            | (rook_attacks & self.rooks)
+            | (
+                BB_KNIGHT_REVERSED_ATTACKS[square][
+                    occupied & BB_KNIGHT_REVERSED_MASKS[square]
+                ]
+                & self.knights
+            )
+            | (
+                BB_BISHOP_ATTACKS[square][occupied & BB_BISHOP_MASKS[square]]
+                & self.bishops
+            )
+            | (BB_PAWN_REVERSED_ATTACKS[color][square] & self.pawns)
+            | (BB_ADVISOR_ATTACKS[square] & self.advisors)
+            | ((BB_KING_ATTACKS[square] | (rook_attacks & self.kings)) & self.kings)
         )
         return attackers & self.occupied_co[color]
 
@@ -940,7 +1600,6 @@ class BaseBoard:
 
 
 class Board(BaseBoard):
-
     turn: Color
 
     fullmove_number: int
@@ -1033,12 +1692,20 @@ class Board(BaseBoard):
     def is_checkmate(self) -> bool:
         return not any(self.generate_legal_moves())
 
-    def _is_safe(self, king: Square, slider_blockers: List[Tuple[Bitboard, Bitboard]],
-                 knight_blockers: List[Tuple(Bitboard, Bitboard)], move: Move) -> bool:
-
+    def _is_safe(
+        self,
+        king: Square,
+        slider_blockers: List[Tuple[Bitboard, Bitboard]],
+        knight_blockers: List[Tuple(Bitboard, Bitboard)],
+        move: Move,
+    ) -> bool:
         if move.from_square == king:
             # 把将去掉
-            return not bool(self._attackers_mask(not self.turn, move.to_square, self.occupied & ~BB_SQUARES[king]))
+            return not bool(
+                self._attackers_mask(
+                    not self.turn, move.to_square, self.occupied & ~BB_SQUARES[king]
+                )
+            )
 
         bb_from = BB_SQUARES[move.from_square]
         bb_to = BB_SQUARES[move.to_square]
@@ -1051,7 +1718,11 @@ class Board(BaseBoard):
         for mask, sniper, limit in slider_blockers:
             # 如果正在移动阻挡棋子
             if mask & bb_from or mask & bb_to:
-                if not (sniper & bb_to) and count_ones(self.occupied & mask & ~bb_from | bb_to & mask) == limit:
+                if (
+                    not (sniper & bb_to)
+                    and count_ones(self.occupied & mask & ~bb_from | bb_to & mask)
+                    == limit
+                ):
                     return False
 
         return True
@@ -1086,15 +1757,21 @@ class Board(BaseBoard):
             return False
 
         checkers = self.attackers_mask(not self.turn, king)
-        if checkers and move not in self._generate_evasions(king, checkers, BB_SQUARES[move.from_square], BB_SQUARES[move.to_square]):
+        if checkers and move not in self._generate_evasions(
+            king, checkers, BB_SQUARES[move.from_square], BB_SQUARES[move.to_square]
+        ):
             return True
 
-        return not self._is_safe(king, self._slider_blockers(king), self._knight_blockers(king), move)
+        return not self._is_safe(
+            king, self._slider_blockers(king), self._knight_blockers(king), move
+        )
 
     def _slider_blockers(self, king: Square) -> List[Tuple[Bitboard, Bitboard, int]]:
-        rays = (BB_FILE_ATTACKS[king][BB_EMPTY] | BB_RANK_ATTACKS[king][BB_EMPTY])
+        rays = BB_FILE_ATTACKS[king][BB_EMPTY] | BB_RANK_ATTACKS[king][BB_EMPTY]
         cannons = rays & self.cannons & self.occupied_co[not self.turn]
-        rooks_and_kings = rays & (self.kings | self.rooks) & self.occupied_co[not self.turn]
+        rooks_and_kings = (
+            rays & (self.kings | self.rooks) & self.occupied_co[not self.turn]
+        )
 
         blockers = []
 
@@ -1123,15 +1800,16 @@ class Board(BaseBoard):
         blockers = BB_EMPTY
         blockers_detail = []
         occupied = BB_KNIGHT_REVERSED_MASKS[king] & self.occupied_co[self.turn]
-        masks = [BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 15],
-                 BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 17],
-                 BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 15],
-                 BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 17],
-                 ]
+        masks = [
+            BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 15],
+            BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king + 17],
+            BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 15],
+            BB_KNIGHT_REVERSED_MASKS[king] & ~BB_SQUARES[king - 17],
+        ]
         for mask in masks:
             attack_knights = BB_KNIGHT_REVERSED_ATTACKS[king][mask] & knights
             if attack_knights and (occupied & ~mask):
-                blockers |= (occupied & ~mask)
+                blockers |= occupied & ~mask
                 if count_ones(attack_knights) == 1:
                     blockers_detail.append((occupied & ~mask, attack_knights))
                 else:
@@ -1139,9 +1817,13 @@ class Board(BaseBoard):
 
         return blockers_detail
 
-    def _generate_evasions(self, king: Square, checkers: Bitboard,
-                           from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD) -> Iterator[Move]:
-
+    def _generate_evasions(
+        self,
+        king: Square,
+        checkers: Bitboard,
+        from_mask: Bitboard = BB_IN_BOARD,
+        to_mask: Bitboard = BB_IN_BOARD,
+    ) -> Iterator[Move]:
         attacked = BB_EMPTY
         for checker in scan_reversed(checkers & self.rooks):
             attacked |= line(king, checker) & ~BB_SQUARES[checker]
@@ -1152,7 +1834,12 @@ class Board(BaseBoard):
             attacked |= line(king, checker) & ~l & ~BB_SQUARES[checker]
 
         if BB_SQUARES[king] & from_mask:
-            for to_square in scan_reversed(BB_KING_ATTACKS[king] & ~self.occupied_co[self.turn] & ~attacked & to_mask):
+            for to_square in scan_reversed(
+                BB_KING_ATTACKS[king]
+                & ~self.occupied_co[self.turn]
+                & ~attacked
+                & to_mask
+            ):
                 yield Move(king, to_square)
 
         if count_ones(checkers) == 1:
@@ -1160,25 +1847,44 @@ class Board(BaseBoard):
             checker = msb(checkers)
             if checkers & (self.rooks | self.kings | self.pawns):
                 target = between(king, checker) | checkers
-                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, target & to_mask)
+                yield from self.generate_pseudo_legal_moves(
+                    ~self.kings & from_mask, target & to_mask
+                )
             elif checkers & self.cannons:
                 target = between(king, checker) | checkers
+                # 吃掉炮
+                yield from self.generate_pseudo_legal_moves(
+                    ~self.kings & from_mask, target & to_mask
+                )
                 # 垫子但不能吃子
-                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask & ~target, target & to_mask & ~self.occupied)
+                yield from self.generate_pseudo_legal_moves(
+                    ~self.kings & from_mask & ~target, target & to_mask & ~self.occupied
+                )
                 # 拆炮架
-                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask & target, ~target & to_mask)
+                yield from self.generate_pseudo_legal_moves(
+                    ~self.kings & from_mask & target, ~target & to_mask
+                )
             elif checkers & self.knights:
+                target = _knight_blocker(king, checker) | checkers
                 # 别马腿
-                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, _knight_blocker(king, checker) & to_mask)
+                yield from self.generate_pseudo_legal_moves(
+                    ~self.kings & from_mask, target & to_mask
+                )
 
         elif count_ones(checkers) == 2:
             # 车炮双将
             cannon_checker = msb(checkers & self.cannons)
             rook_checker = msb(checkers & self.rooks)
-            if line(cannon_checker, rook_checker) & BB_SQUARES[king] and not (between(cannon_checker, rook_checker) & BB_SQUARES[king]):
-                yield from self.generate_pseudo_legal_moves(~self.kings & from_mask, between(king, rook_checker) & to_mask)
+            if line(cannon_checker, rook_checker) & BB_SQUARES[king] and not (
+                between(cannon_checker, rook_checker) & BB_SQUARES[king]
+            ):
+                yield from self.generate_pseudo_legal_moves(
+                    ~self.kings & from_mask, between(king, rook_checker) & to_mask
+                )
 
-    def generate_pseudo_legal_moves(self, from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD) -> Iterator[Move]:
+    def generate_pseudo_legal_moves(
+        self, from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD
+    ) -> Iterator[Move]:
         our_pieces = self.occupied_co[self.turn]
 
         from_squares = our_pieces & from_mask
@@ -1187,7 +1893,9 @@ class Board(BaseBoard):
             for to_square in scan_reversed(moves):
                 yield Move(from_square, to_square)
 
-    def generate_legal_moves(self, from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD) -> Iterator[Move]:
+    def generate_legal_moves(
+        self, from_mask: Bitboard = BB_IN_BOARD, to_mask: Bitboard = BB_IN_BOARD
+    ) -> Iterator[Move]:
         king_mask = self.kings & self.occupied_co[self.turn]
         if king_mask:
             king = msb(king_mask)
@@ -1222,20 +1930,24 @@ class Board(BaseBoard):
             return
 
         piece_type = self._remove_piece_at(move.from_square)
-        assert piece_type is not None, f"push() expects move to be pseudo-legal, but got {move} in {self.board_fen()}"
+        assert (
+            piece_type is not None
+        ), f"push() expects move to be pseudo-legal, but got {move} in {self.board_fen()}"
 
         self._set_piece_at(move.to_square, piece_type, self.turn)
         self.turn = not self.turn
 
     def fen(self) -> str:
-        return " ".join([
-            self.board_fen(),
-            "w" if self.turn == RED else "b",
-            "-",
-            "-",
-            str(0),
-            str(self.fullmove_number)
-        ])
+        return " ".join(
+            [
+                self.board_fen(),
+                "w" if self.turn == RED else "b",
+                "-",
+                "-",
+                str(0),
+                str(self.fullmove_number),
+            ]
+        )
 
     def pop(self) -> Move:
         if not len(self.move_stack):
@@ -1305,45 +2017,69 @@ class Board(BaseBoard):
             result += PIECE_SYMBOLS[piece] + str(from_file_wxf)
 
         # 兵卒
-        elif (piece == PAWN):
-            other = self.pieces_mask(piece, self.turn) & BB_FILES[from_square_file] & ~BB_SQUARES[from_square]
+        elif piece == PAWN:
+            other = (
+                self.pieces_mask(piece, self.turn)
+                & BB_FILES[from_square_file]
+                & ~BB_SQUARES[from_square]
+            )
             if not other:
                 result += PIECE_SYMBOLS[piece] + str(from_file_wxf)
             else:
                 pawns = []
                 for bb_file in BB_FILES[::-1]:
                     file_pawns = []
-                    for p in scan_reversed(bb_file & self.pawns & self.occupied_co[self.turn]):
+                    for p in scan_reversed(
+                        bb_file & self.pawns & self.occupied_co[self.turn]
+                    ):
                         file_pawns.append(p)
                     if len(file_pawns) > 1:
                         pawns += file_pawns
                 if len(pawns) == 2:
-                    result = PIECE_SYMBOLS[piece] + [plus_symbol, minus_symbol][pawns.index(from_square)]
+                    result = (
+                        PIECE_SYMBOLS[piece]
+                        + [plus_symbol, minus_symbol][pawns.index(from_square)]
+                    )
                 elif len(pawns) == 3:
-                    result = PIECE_SYMBOLS[piece] + [plus_symbol, ".", minus_symbol][pawns.index(from_square)]
+                    result = (
+                        PIECE_SYMBOLS[piece]
+                        + [plus_symbol, ".", minus_symbol][pawns.index(from_square)]
+                    )
                 else:
                     if self.turn == RED:
                         result = PIECE_SYMBOLS[piece] + chars[pawns.index(from_square)]
                     else:
-                        result = PIECE_SYMBOLS[piece] + chars[pawns[::-1].index(from_square)]
+                        result = (
+                            PIECE_SYMBOLS[piece] + chars[pawns[::-1].index(from_square)]
+                        )
 
         # 车马帅将炮
         else:
-            other = self.pieces_mask(piece, self.turn) & BB_FILES[from_square_file] & ~BB_SQUARES[from_square]
+            other = (
+                self.pieces_mask(piece, self.turn)
+                & BB_FILES[from_square_file]
+                & ~BB_SQUARES[from_square]
+            )
             if other:
-                result += PIECE_SYMBOLS[piece] + (plus_symbol if msb(other) < from_square else minus_symbol)
+                result += PIECE_SYMBOLS[piece] + (
+                    plus_symbol if msb(other) < from_square else minus_symbol
+                )
             else:
                 result += PIECE_SYMBOLS[piece] + str(from_file_wxf)
 
         # 马相象仕士
         if piece == KNIGHT or piece == BISHOP or piece == ADVISOR:
-            result += (plus_symbol if from_square < to_square else minus_symbol) + str(to_file_wxf)
+            result += (plus_symbol if from_square < to_square else minus_symbol) + str(
+                to_file_wxf
+            )
 
         # 车帅将炮兵卒
         else:
             offset = count_ones(between(from_square, to_square)) + 1
             if abs(from_square - to_square) > 15:
-                result += (minus_symbol if from_square > to_square else plus_symbol) + str(offset)
+                result += (
+                    minus_symbol if from_square > to_square else plus_symbol
+                ) + str(offset)
             else:
                 result += "." + str(to_file_wxf)
 
@@ -1351,7 +2087,6 @@ class Board(BaseBoard):
 
 
 class PseudoLegalMoveGenerator:
-
     def __init__(self, board: Board) -> None:
         self.board = board
 
@@ -1381,7 +2116,6 @@ class PseudoLegalMoveGenerator:
 
 
 class LegalMoveGenerator:
-
     def __init__(self, board: Board) -> None:
         self.board = board
 
